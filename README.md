@@ -1,6 +1,6 @@
 # VolumeLeaders
 
-A command-line tool to display stock volume leaders.
+A command-line tool to open stock charts on VolumeLeaders.com.
 
 ## Installation
 
@@ -18,22 +18,19 @@ brew install donoage/vl/vl
 ## Usage
 
 ```bash
-# Display top 10 volume leaders (default)
-vl
-
-# Display information for a specific ticker
+# Open VolumeLeaders chart for a specific ticker
 vl AAPL
 
 # Display help
-vl --help
+vl
 ```
 
 ## Features
 
 - Simple command-line interface
-- View top volume leaders
-- View detailed information for a specific ticker
-- Fast and lightweight
+- Opens VolumeLeaders charts directly in Google Chrome
+- Automatically sets date range to last 90 days
+- All chart parameters are pre-configured for optimal viewing
 
 ## License
 

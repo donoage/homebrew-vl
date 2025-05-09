@@ -1,9 +1,9 @@
 class Vl < Formula
   desc "Command-line tool to display stock volume leaders"
   homepage "https://github.com/donoage/homebrew-vl"
-  url "https://raw.githubusercontent.com/donoage/homebrew-vl/v1.0.2/bin/vl"
-  sha256 "b9ae713c176e4fe388c11ec25998758bd9ab813498e920eda090f27840779666"
-  version "1.0.3"
+  url "https://raw.githubusercontent.com/donoage/homebrew-vl/v1.0.3/bin/vl"
+  sha256 "88db58dc134997dc998d11dc2f123313562e688f942bd693291fa920c19a0267"
+  version "1.0.4"
 
   def install
     bin.install "vl"
@@ -11,6 +11,6 @@ class Vl < Formula
   end
 
   test do
-    system "#{bin}/vl", "--help"
+    assert_match "Usage: vl TICKER", shell_output("#{bin}/vl 2>&1", 1)
   end
 end 
