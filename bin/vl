@@ -19,16 +19,16 @@ if [ -z "$1" ]; then
   echo "======================="
   echo "Symbol  | Volume     | Price   | Change"
   echo "--------|------------|---------|-------"
-  echo "AAPL    | 85,267,432 | $178.72 | +2.3%"
-  echo "MSFT    | 43,876,211 | $412.41 | +1.7%"
-  echo "AMZN    | 32,145,987 | $178.92 | -0.5%"
-  echo "TSLA    | 28,754,321 | $177.29 | -1.2%"
-  echo "GOOG    | 18,432,156 | $172.21 | +0.8%"
-  echo "META    | 15,876,543 | $474.11 | +2.1%"
-  echo "NVDA    | 12,987,654 | $917.01 | +3.2%"
-  echo "BRK.B   | 10,234,567 | $408.80 | +0.4%"
-  echo "JPM     | 8,765,432  | $196.16 | -0.2%"
-  echo "JNJ     | 6,543,210  | $146.85 | +0.1%"
+  echo "AAPL    | 85,267,432 | \$178.72 | +2.3%"
+  echo "MSFT    | 43,876,211 | \$412.41 | +1.7%"
+  echo "AMZN    | 32,145,987 | \$178.92 | -0.5%"
+  echo "TSLA    | 28,754,321 | \$177.29 | -1.2%"
+  echo "GOOG    | 18,432,156 | \$172.21 | +0.8%"
+  echo "META    | 15,876,543 | \$474.11 | +2.1%"
+  echo "NVDA    | 12,987,654 | \$917.01 | +3.2%"
+  echo "BRK.B   | 10,234,567 | \$408.80 | +0.4%"
+  echo "JPM     | 8,765,432  | \$196.16 | -0.2%"
+  echo "JNJ     | 6,543,210  | \$146.85 | +0.1%"
 else
   # Display info for the specific ticker
   TICKER=$(echo "$1" | tr '[:lower:]' '[:upper:]')
@@ -39,33 +39,33 @@ else
   case "$TICKER" in
     AAPL)
       echo "Apple Inc."
-      echo "Price: $178.72 (+2.3%)"
+      echo "Price: \$178.72 (+2.3%)"
       echo "Volume: 85,267,432"
-      echo "52-Week Range: $145.20 - $198.23"
+      echo "52-Week Range: \$145.20 - \$198.23"
       ;;
     MSFT)
       echo "Microsoft Corporation"
-      echo "Price: $412.41 (+1.7%)"
+      echo "Price: \$412.41 (+1.7%)"
       echo "Volume: 43,876,211"
-      echo "52-Week Range: $302.15 - $421.80"
+      echo "52-Week Range: \$302.15 - \$421.80"
       ;;
     AMZN)
       echo "Amazon.com Inc."
-      echo "Price: $178.92 (-0.5%)"
+      echo "Price: \$178.92 (-0.5%)"
       echo "Volume: 32,145,987"
-      echo "52-Week Range: $118.35 - $186.56"
+      echo "52-Week Range: \$118.35 - \$186.56"
       ;;
     TSLA)
       echo "Tesla, Inc."
-      echo "Price: $177.29 (-1.2%)"
+      echo "Price: \$177.29 (-1.2%)"
       echo "Volume: 28,754,321"
-      echo "52-Week Range: $152.37 - $299.29"
+      echo "52-Week Range: \$152.37 - \$299.29"
       ;;
     GOOG)
       echo "Alphabet Inc."
-      echo "Price: $172.21 (+0.8%)"
+      echo "Price: \$172.21 (+0.8%)"
       echo "Volume: 18,432,156"
-      echo "52-Week Range: $115.35 - $178.00"
+      echo "52-Week Range: \$115.35 - \$178.00"
       ;;
     *)
       echo "Data not available for $TICKER"
