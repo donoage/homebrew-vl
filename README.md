@@ -6,26 +6,26 @@ A command-line tool to display stock volume leaders.
 
 ```bash
 brew tap donoage/vl
-brew install volumeleaders
+brew install vl
 ```
 
 Or install directly:
 
 ```bash
-brew install donoage/vl/volumeleaders
+brew install donoage/vl/vl
 ```
 
 ## Usage
 
 ```bash
 # Display top 10 volume leaders (default)
-volumeleaders
+vl
 
 # Display top N volume leaders
-volumeleaders --top=20
+vl --top=20
 
 # Display help
-volumeleaders --help
+vl --help
 ```
 
 ## Features
