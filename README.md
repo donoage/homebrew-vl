@@ -21,8 +21,8 @@ brew install donoage/vl/vl
 # Display top 10 volume leaders (default)
 vl
 
-# Display top N volume leaders
-vl --top=20
+# Display information for a specific ticker
+vl AAPL
 
 # Display help
 vl --help
@@ -31,7 +31,8 @@ vl --help
 ## Features
 
 - Simple command-line interface
-- Customizable number of stocks to display
+- View top volume leaders
+- View detailed information for a specific ticker
 - Fast and lightweight
 
 ## License
