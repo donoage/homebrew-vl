@@ -5,6 +5,13 @@ A command-line tool to display stock volume leaders.
 ## Installation
 
 ```bash
+brew tap donoage/vl
+brew install volumeleaders
+```
+
+Or install directly:
+
+```bash
 brew install donoage/vl/volumeleaders
 ```
 
