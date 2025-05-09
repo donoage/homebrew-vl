@@ -1,0 +1,77 @@
+name: Publish Homebrew Formula
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'bin/**'
+      - 'Formula/**'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get current version from formula
+          CURRENT_VERSION=$(grep -m 1 'version' Formula/vl.rb | sed 's/.*version "\(.*\)"/\1/')
+          echo "Current version: $CURRENT_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if we need to create a new tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Update SHA256 checksum if necessary
+        id: update_sha
+        run: |
+          # Calculate SHA256 for the script
+          CALCULATED_SHA=$(shasum -a 256 bin/vl | awk '{print $1}')
+          CURRENT_SHA=$(grep -m 1 'sha256' Formula/vl.rb | sed 's/.*sha256 "\(.*\)"/\1/')
+          
+          echo "Calculated SHA: $CALCULATED_SHA"
+          echo "Current SHA: $CURRENT_SHA"
+          
+          if [ "$CALCULATED_SHA" != "$CURRENT_SHA" ]; then
+            echo "SHA256 checksum has changed, updating formula..."
+            sed -i '' "s/sha256 \"$CURRENT_SHA\"/sha256 \"$CALCULATED_SHA\"/" Formula/vl.rb
+            git add Formula/vl.rb
+            git commit -m "Update SHA256 checksum [skip ci]"
+            git push
+            echo "sha_updated=true" >> $GITHUB_OUTPUT
+          else
+            echo "SHA256 checksum is already up to date"
+            echo "sha_updated=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create new release if version changed
+        if: steps.update_sha.outputs.sha_updated == 'true' || steps.get_tag.outputs.latest_tag != 'v${{ steps.get_tag.outputs.current_version }}'
+        run: |
+          VERSION="${{ steps.get_tag.outputs.current_version }}"
+          echo "Creating new release for v$VERSION"
+          
+          # Create and push tag
+          git tag -a "v$VERSION" -m "Version $VERSION"
+          git push origin "v$VERSION"
+          
+          # Create GitHub release
+          gh release create "v$VERSION" \
+            --title "VolumeLeaders v$VERSION" \
+            --notes "Release of VolumeLeaders v$VERSION" \
+            ./bin/vl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
