@@ -14,6 +14,9 @@ TICKER="$1"
 START_DATE=$(date -v-90d +%Y-%m-%d)
 END_DATE=$(date +%Y-%m-%d)
 
+# Calculate date for 30 days ago
+START_DATE_30=$(date -v-30d +%Y-%m-%d)
+
 # URL for the chart on VolumeLeaders
 URL="https://www.volumeleaders.com/Chart?\
 StartDate=${START_DATE}&\
@@ -42,5 +45,34 @@ IncludeClosing=1&\
 IncludePhantom=1&\
 IncludeOffsetting=1"
 
-# Open URL in Chrome
-open -a "Google Chrome" "$URL" 
+# Second URL with DarkPools=1 and Sweeps=1 and 30 days lookback
+URL2="https://www.volumeleaders.com/Chart?\
+StartDate=${START_DATE_30}&\
+EndDate=${END_DATE}&\
+Ticker=${TICKER}&\
+MinVolume=0&\
+MaxVolume=2000000000&\
+MinDollars=500000&\
+MaxDollars=300000000000&\
+MinPrice=0&\
+MaxPrice=100000&\
+DarkPools=1&\
+Sweeps=1&\
+LatePrints=-1&\
+SignaturePrints=0&\
+VolumeProfile=0&\
+Levels=5&\
+TradeCount=5&\
+VCD=0&\
+TradeRank=-1&\
+IncludePremarket=1&\
+IncludeRTH=1&\
+IncludeAH=1&\
+IncludeOpening=1&\
+IncludeClosing=1&\
+IncludePhantom=1&\
+IncludeOffsetting=1"
+
+# Open URLs in Chrome
+open -a "Google Chrome" "$URL"
+open -a "Google Chrome" "$URL2" 
