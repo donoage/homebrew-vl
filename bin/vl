@@ -73,6 +73,6 @@ IncludeClosing=1&\
 IncludePhantom=1&\
 IncludeOffsetting=1"
 
-# Open URLs in Chrome
+# Open the URLs in Chrome
 open -a "Google Chrome" "$URL"
 open -a "Google Chrome" "$URL2" 
