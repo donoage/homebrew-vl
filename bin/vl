@@ -15,7 +15,7 @@ START_DATE=$(date -v-90d +%Y-%m-%d)
 END_DATE=$(date +%Y-%m-%d)
 
 # URL for the chart on VolumeLeaders
-URL="https://www.volumeleaders.com/Chart0?\
+URL="https://www.volumeleaders.com/Chart?\
 StartDate=${START_DATE}&\
 EndDate=${END_DATE}&\
 Ticker=${TICKER}&\
@@ -30,8 +30,8 @@ Sweeps=-1&\
 LatePrints=-1&\
 SignaturePrints=0&\
 VolumeProfile=0&\
-Levels=10&\
-TradeCount=10&\
+Levels=5&\
+TradeCount=5&\
 VCD=0&\
 TradeRank=-1&\
 IncludePremarket=1&\
