@@ -376,8 +376,17 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                     $windowText = New-Object System.Text.StringBuilder($windowTextLength + 1)
                     [Win32]::GetWindowText($hwnd, $windowText, $windowText.Capacity) | Out-Null
                     
-                    # Check for volumeleaders in title
-                    if ($windowText.ToString() -like "*volumeleaders*") {
+                    # Check for browser windows - first look for volumeleaders in title
+                    $isVolumeLeaders = $windowText.ToString() -like "*volumeleaders*"
+                    
+                    # If it's a volumeleaders window or has certain browser keywords in the title
+                    $isBrowserWindow = $isVolumeLeaders -or 
+                                      $windowText.ToString() -like "*Chrome*" -or 
+                                      $windowText.ToString() -like "*Edge*" -or
+                                      $windowText.ToString() -like "*- Google Chrome" -or
+                                      $windowText.ToString() -like "*- Microsoft Edge"
+                    
+                    if ($isBrowserWindow) {
                         $rect = New-Object Win32+RECT
                         [Win32]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
                         
@@ -403,7 +412,16 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             # Enumerate all windows
             [Win32]::EnumWindows($enumWindowsCallback, [IntPtr]::Zero) | Out-Null
             
-            return $windows
+            # Prioritize windows with "volumeleaders" in the title
+            $volumeLeadersWindows = $windows | Where-Object { $_.Title -like "*volumeleaders*" }
+            
+            # If we found volumeleaders windows, use those, otherwise use all browser windows we found
+            if ($volumeLeadersWindows.Count -gt 0) {
+                return $volumeLeadersWindows
+            }
+            
+            # If we don't have enough windows, just return all we found (up to 4)
+            return $windows | Select-Object -First 4
         }
         
         # Find all VolumeLeaders windows
@@ -613,15 +631,39 @@ def open_urls_windows(url1, url2, url3, url4):
             
             # Check for existing VolumeLeaders windows
             try:
-                # Create PowerShell command to find existing windows
+                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
                 ps_cmd = '''
                 $browsers = @();
                 try {
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Chrome windows with volumeleaders in title
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
                 try {
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Edge windows with volumeleaders in title
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
+                
+                # If we didn't find any browser windows with the above criteria, 
+                # look for any Chrome or Edge windows
+                if ($browsers.Count -eq 0) {
+                    try {
+                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
+                            Select-Object -First 4;
+                    } catch {};
+                    try {
+                        if ($browsers.Count -eq 0) {
+                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
+                                Select-Object -First 4;
+                        }
+                    } catch {};
+                }
+                
                 if ($browsers.Count -gt 0) { 
                     # Return process IDs as CSV
                     return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
@@ -664,7 +706,10 @@ def open_urls_windows(url1, url2, url3, url4):
                         $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                         
                         # Get all browser windows
-                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ 
+                            $_.MainWindowTitle -like "*volumeleaders*" -or
+                            ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
+                        }} | Select-Object -First 4;
                         
                         # For each window we found
                         for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
@@ -841,11 +886,35 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 ps_cmd = '''
                 $browsers = @();
                 try {
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Chrome windows with volumeleaders in title
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
                 try {
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Edge windows with volumeleaders in title
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
+                
+                # If we didn't find any browser windows with the above criteria, 
+                # look for any Chrome or Edge windows
+                if ($browsers.Count -eq 0) {
+                    try {
+                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
+                            Select-Object -First 4;
+                    } catch {};
+                    try {
+                        if ($browsers.Count -eq 0) {
+                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
+                                Select-Object -First 4;
+                        }
+                    } catch {};
+                }
+                
                 if ($browsers.Count -gt 0) { 
                     # Return process IDs as CSV
                     return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
@@ -889,7 +958,10 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                         $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                         
                         # Get all browser windows
-                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ 
+                            $_.MainWindowTitle -like "*volumeleaders*" -or
+                            ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
+                        }} | Select-Object -First 4;
                         
                         # For each window we found
                         for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
@@ -1094,11 +1166,35 @@ def open_urls_wsl(url1, url2, url3, url4):
                 ps_cmd = '''
                 $browsers = @();
                 try {
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Chrome windows with volumeleaders in title
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
                 try {
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                    # Try to find Edge windows with volumeleaders in title
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
+                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
                 } catch {};
+                
+                # If we didn't find any browser windows with the above criteria, 
+                # look for any Chrome or Edge windows
+                if ($browsers.Count -eq 0) {
+                    try {
+                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
+                            Select-Object -First 4;
+                    } catch {};
+                    try {
+                        if ($browsers.Count -eq 0) {
+                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
+                                Select-Object -First 4;
+                        }
+                    } catch {};
+                }
+                
                 if ($browsers.Count -gt 0) { 
                     # Return process IDs as CSV
                     return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
@@ -1142,7 +1238,10 @@ def open_urls_wsl(url1, url2, url3, url4):
                         $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                         
                         # Get all browser windows
-                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ 
+                            $_.MainWindowTitle -like "*volumeleaders*" -or
+                            ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
+                        }} | Select-Object -First 4;
                         
                         # For each window we found
                         for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
