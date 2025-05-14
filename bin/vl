@@ -321,29 +321,42 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             subprocess.run([chrome_path, url4])
             return
             
-        # If Chrome not found, try with cmd.exe and explicit browser command
-        print("Chrome not found, trying with cmd.exe and default browser...")
-        subprocess.run(['cmd.exe', '/c', f'start "" "{url1}"'])
-        time.sleep(1)
-        subprocess.run(['cmd.exe', '/c', f'start "" "{url2}"'])
-        time.sleep(1)
-        subprocess.run(['cmd.exe', '/c', f'start "" "{url3}"'])
-        time.sleep(1)
-        subprocess.run(['cmd.exe', '/c', f'start "" "{url4}"'])
+        # If Chrome not found, try with PowerShell instead of cmd.exe
+        print("Chrome not found, trying with PowerShell and default browser...")
+        
+        # Use PowerShell from C drive to avoid UNC path issues
+        ps_commands = [
+            f'Start-Process "{url1}"',
+            f'Start-Process "{url2}"',
+            f'Start-Process "{url3}"',
+            f'Start-Process "{url4}"'
+        ]
+        
+        # Change to C: drive first to avoid UNC path issues
+        for cmd in ps_commands:
+            try:
+                # Run PowerShell with a CD command first to avoid UNC path issues
+                full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
+                print(f"Running: {full_cmd}")
+                subprocess.run(full_cmd, shell=True)
+                time.sleep(1)
+            except Exception as e:
+                print(f"PowerShell command failed: {e}")
         
     except Exception as e:
         print(f"Parallels WSL browser opening method failed: {e}")
         print("Trying alternative methods...")
         
         try:
-            # Try with explorer.exe as a last resort
-            subprocess.run(['explorer.exe', url1])
+            # Try with explorer.exe as a last resort, with explicit path
+            print("Trying explorer.exe with explicit C: drive path...")
+            subprocess.run(["cd /mnt/c && explorer.exe", url1], shell=True)
             time.sleep(1)
-            subprocess.run(['explorer.exe', url2])
+            subprocess.run(["cd /mnt/c && explorer.exe", url2], shell=True)
             time.sleep(1)
-            subprocess.run(['explorer.exe', url3])
+            subprocess.run(["cd /mnt/c && explorer.exe", url3], shell=True)
             time.sleep(1)
-            subprocess.run(['explorer.exe', url4])
+            subprocess.run(["cd /mnt/c && explorer.exe", url4], shell=True)
             
         except Exception as e2:
             print(f"Alternative method failed: {e2}")
@@ -365,31 +378,41 @@ def open_urls_wsl(url1, url2, url3, url4):
         ps_url3 = url3.replace('"', '\\"')
         ps_url4 = url4.replace('"', '\\"')
         
-        # Open each URL using powershell.exe Start-Process
-        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url1}"'])
-        time.sleep(1)
-        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url2}"'])
-        time.sleep(1)
-        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url3}"'])
-        time.sleep(1)
-        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url4}"'])
+        # Change to C: drive first to avoid UNC path issues
+        ps_commands = [
+            f'Start-Process "{ps_url1}"',
+            f'Start-Process "{ps_url2}"',
+            f'Start-Process "{ps_url3}"',
+            f'Start-Process "{ps_url4}"'
+        ]
+        
+        for cmd in ps_commands:
+            try:
+                # Run PowerShell with a CD command first to avoid UNC path issues
+                full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
+                print(f"Running: {full_cmd}")
+                subprocess.run(full_cmd, shell=True)
+                time.sleep(1)
+            except Exception as e:
+                print(f"PowerShell command failed: {e}")
         
     except Exception as e:
         print(f"WSL browser opening method failed: {e}")
-        print("Trying alternative method with cmd.exe...")
+        print("Trying alternative method...")
         
         try:
-            # Alternative approach using cmd.exe and start command
-            subprocess.run(['cmd.exe', '/c', f'start {url1}'])
+            # Try with explorer.exe as a last resort, with explicit path
+            print("Trying explorer.exe with explicit C: drive path...")
+            subprocess.run(["cd /mnt/c && explorer.exe", url1], shell=True)
             time.sleep(1)
-            subprocess.run(['cmd.exe', '/c', f'start {url2}'])
+            subprocess.run(["cd /mnt/c && explorer.exe", url2], shell=True)
             time.sleep(1)
-            subprocess.run(['cmd.exe', '/c', f'start {url3}'])
+            subprocess.run(["cd /mnt/c && explorer.exe", url3], shell=True)
             time.sleep(1)
-            subprocess.run(['cmd.exe', '/c', f'start {url4}'])
+            subprocess.run(["cd /mnt/c && explorer.exe", url4], shell=True)
             
         except Exception as e2:
-            print(f"Alternative WSL method failed: {e2}")
+            print(f"Alternative method failed: {e2}")
             print("Please manually open the following URLs:")
             print(f"URL 1: {url1}")
             print(f"URL 2: {url2}")
