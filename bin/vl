@@ -55,17 +55,59 @@ def main():
         print(f"Detected {system} - Opening URLs in default browser")
         open_urls_default(url1, url2, url3, url4)
 
+def get_screen_dimensions_macos():
+    """Get screen dimensions on macOS using AppleScript."""
+    applescript = '''
+    tell application "Finder"
+        set _bounds to bounds of window of desktop
+        set screenWidth to item 3 of _bounds
+        set screenHeight to item 4 of _bounds
+        return screenWidth & "," & screenHeight
+    end tell
+    '''
+    
+    try:
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+        if result.stdout.strip():
+            dimensions = result.stdout.strip().split(',')
+            if len(dimensions) == 2:
+                screen_width = int(float(dimensions[0]))
+                screen_height = int(float(dimensions[1]))
+                return screen_width, screen_height
+        
+        # If we got here, try an alternative method
+        applescript_alt = '''
+        tell application "System Events"
+            set _display to first display
+            return (value of _display's width) & "," & (value of _display's height)
+        end tell
+        '''
+        
+        result = subprocess.run(["osascript", "-e", applescript_alt], capture_output=True, text=True)
+        if result.stdout.strip():
+            dimensions = result.stdout.strip().split(',')
+            if len(dimensions) == 2:
+                screen_width = int(float(dimensions[0]))
+                screen_height = int(float(dimensions[1]))
+                return screen_width, screen_height
+                
+        # If we still don't have dimensions, fallback to defaults
+        return 2880, 1600
+    except Exception as e:
+        print(f"Error getting screen dimensions: {e}")
+        # Fallback to default values
+        return 2880, 1600
+
 def open_urls_macos(url1, url2, url3, url4):
     """Open URLs on macOS with Chrome and position windows."""
-    # Use screen resolution of 2880x1600 (can be adjusted)
-    screen_width = 2880
-    screen_height = 1600
+    # Get screen dimensions
+    screen_width, screen_height = get_screen_dimensions_macos()
     
     # Calculate half width and height
     half_width = screen_width // 2
     half_height = screen_height // 2
     
-    print(f"Using screen resolution: {screen_width}x{screen_height}")
+    print(f"Detected screen resolution: {screen_width}x{screen_height}")
     print(f"Window dimensions will be: {half_width}x{half_height}")
     
     # Make sure Chrome is running
@@ -271,9 +313,13 @@ def open_urls_windows(url1, url2, url3, url4):
         $screenWidth = $screen.Bounds.Width
         $screenHeight = $screen.Bounds.Height
         
+        Write-Host "Detected screen resolution: $screenWidth x $screenHeight"
+        
         # Calculate half dimensions
         $halfWidth = $screenWidth / 2
         $halfHeight = $screenHeight / 2
+        
+        Write-Host "Window dimensions will be: $halfWidth x $halfHeight"
         
         # Open Chrome windows in a grid
         $chrome1 = Open-ChromeAtPosition "{url1}" 0 0 $halfWidth $halfHeight
