@@ -331,12 +331,15 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             # Use Windows browser directly - open all windows first without waiting
             print(f"Launching {browser_name} windows...")
             
-            # Start all browser processes without waiting
+            # Use --new-window flag to force new windows instead of tabs
             processes = []
-            processes.append(subprocess.Popen([browser_path, url1]))
-            processes.append(subprocess.Popen([browser_path, url2]))
-            processes.append(subprocess.Popen([browser_path, url3]))
-            processes.append(subprocess.Popen([browser_path, url4]))
+            processes.append(subprocess.Popen([browser_path, "--new-window", url1]))
+            time.sleep(1)  # Give first window time to fully initialize
+            processes.append(subprocess.Popen([browser_path, "--new-window", url2]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([browser_path, "--new-window", url3]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([browser_path, "--new-window", url4]))
             
             # Give them a moment to start
             time.sleep(3)
@@ -404,10 +407,10 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
         
         # Use PowerShell from C drive to avoid UNC path issues
         ps_commands = [
-            f'Start-Process "{url1}"',
-            f'Start-Process "{url2}"',
-            f'Start-Process "{url3}"',
-            f'Start-Process "{url4}"'
+            f'Start-Process -WindowStyle Normal "{url1}"',
+            f'Start-Process -WindowStyle Normal "{url2}"',
+            f'Start-Process -WindowStyle Normal "{url3}"',
+            f'Start-Process -WindowStyle Normal "{url4}"'
         ]
         
         # Change to C: drive first to avoid UNC path issues
@@ -417,6 +420,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
                 print(f"Running: {full_cmd}")
                 subprocess.run(full_cmd, shell=True)
+                time.sleep(1)
             except Exception as e:
                 print(f"PowerShell command failed: {e}")
         
@@ -548,12 +552,15 @@ def open_urls_wsl(url1, url2, url3, url4):
         if browser_path:
             print(f"Launching {browser_name} windows...")
             
-            # Start all browser processes without waiting
+            # Use --new-window flag to force new windows instead of tabs
             processes = []
-            processes.append(subprocess.Popen([browser_path, url1]))
-            processes.append(subprocess.Popen([browser_path, url2]))
-            processes.append(subprocess.Popen([browser_path, url3]))
-            processes.append(subprocess.Popen([browser_path, url4]))
+            processes.append(subprocess.Popen([browser_path, "--new-window", url1]))
+            time.sleep(1)  # Give first window time to fully initialize
+            processes.append(subprocess.Popen([browser_path, "--new-window", url2]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([browser_path, "--new-window", url3]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([browser_path, "--new-window", url4]))
             
             # Give them a moment to start
             time.sleep(3)
@@ -627,10 +634,10 @@ def open_urls_wsl(url1, url2, url3, url4):
         
         # Change to C: drive first to avoid UNC path issues
         ps_commands = [
-            f'Start-Process "{ps_url1}"',
-            f'Start-Process "{ps_url2}"',
-            f'Start-Process "{ps_url3}"',
-            f'Start-Process "{ps_url4}"'
+            f'Start-Process -WindowStyle Normal "{ps_url1}"',
+            f'Start-Process -WindowStyle Normal "{ps_url2}"',
+            f'Start-Process -WindowStyle Normal "{ps_url3}"',
+            f'Start-Process -WindowStyle Normal "{ps_url4}"'
         ]
         
         for cmd in ps_commands:
@@ -639,6 +646,7 @@ def open_urls_wsl(url1, url2, url3, url4):
                 full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
                 print(f"Running: {full_cmd}")
                 subprocess.run(full_cmd, shell=True)
+                time.sleep(1)
             except Exception as e:
                 print(f"PowerShell command failed: {e}")
         
@@ -757,12 +765,15 @@ def open_urls_windows(url1, url2, url3, url4):
             browser_name = "Edge" if "edge" in chrome_path.lower() or "msedge" in chrome_path.lower() else "Chrome"
             print(f"Launching {browser_name} windows...")
             
-            # Start all browser processes without waiting
+            # Use --new-window flag to force new windows instead of tabs
             processes = []
-            processes.append(subprocess.Popen([chrome_path, url1]))
-            processes.append(subprocess.Popen([chrome_path, url2]))
-            processes.append(subprocess.Popen([chrome_path, url3]))
-            processes.append(subprocess.Popen([chrome_path, url4]))
+            processes.append(subprocess.Popen([chrome_path, "--new-window", url1]))
+            time.sleep(1)  # Give first window time to fully initialize
+            processes.append(subprocess.Popen([chrome_path, "--new-window", url2]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([chrome_path, "--new-window", url3]))
+            time.sleep(1)
+            processes.append(subprocess.Popen([chrome_path, "--new-window", url4]))
             
             # Give them a moment to start
             time.sleep(3)
@@ -837,8 +848,11 @@ def open_urls_windows(url1, url2, url3, url4):
             print("Neither Chrome nor Edge found. Trying to use default browser...")
             # Try to use the default browser through Windows start command
             os.system(f'start "" "{url1}"')
+            time.sleep(1)
             os.system(f'start "" "{url2}"')
+            time.sleep(1)
             os.system(f'start "" "{url3}"')
+            time.sleep(1)
             os.system(f'start "" "{url4}"')
             
             # Wait a moment and try to position windows
