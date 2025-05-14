@@ -280,7 +280,7 @@ def open_urls_macos(url1, url2, url3, url4):
 def open_urls_parallels_wsl(url1, url2, url3, url4):
     """Open URLs when running in Parallels WSL environment."""
     try:
-        print("Opening URLs in Windows Chrome under Parallels...")
+        print("Opening URLs in Windows browser under Parallels...")
         
         # Try to find Chrome in common Parallels Windows locations
         chrome_paths = [
@@ -290,39 +290,57 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             # Add more potential paths if needed
         ]
         
-        chrome_path = None
-        # First check exact paths
+        browser_path = None
+        browser_name = "Chrome"
+        
+        # First check exact paths for Chrome
         for path in chrome_paths:
             if '*' not in path and os.path.exists(path):
-                chrome_path = path
-                print(f"Found Chrome at: {chrome_path}")
+                browser_path = path
+                print(f"Found Chrome at: {browser_path}")
                 break
         
-        # If not found, try expanding wildcards
-        if not chrome_path:
+        # If not found, try expanding wildcards for Chrome
+        if not browser_path:
             for path in chrome_paths:
                 if '*' in path:
                     # Try to expand wildcard paths
                     matching_paths = glob.glob(path)
                     if matching_paths:
-                        chrome_path = matching_paths[0]
-                        print(f"Found Chrome at: {chrome_path}")
+                        browser_path = matching_paths[0]
+                        print(f"Found Chrome at: {browser_path}")
                         break
+                        
+        # If Chrome not found, try Microsoft Edge
+        if not browser_path:
+            print("Chrome not found. Looking for Microsoft Edge...")
+            edge_paths = [
+                '/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+                '/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe',
+                # Add more potential paths if needed
+            ]
+            
+            for path in edge_paths:
+                if os.path.exists(path):
+                    browser_path = path
+                    browser_name = "Edge"
+                    print(f"Found Microsoft Edge at: {browser_path}")
+                    break
         
-        if chrome_path:
-            # Use Windows Chrome directly
-            print(f"Launching Chrome: {chrome_path}")
-            subprocess.run([chrome_path, url1])
+        if browser_path:
+            # Use Windows browser directly
+            print(f"Launching {browser_name}: {browser_path}")
+            subprocess.run([browser_path, url1])
             time.sleep(1)
-            subprocess.run([chrome_path, url2])
+            subprocess.run([browser_path, url2])
             time.sleep(1)
-            subprocess.run([chrome_path, url3])
+            subprocess.run([browser_path, url3])
             time.sleep(1)
-            subprocess.run([chrome_path, url4])
+            subprocess.run([browser_path, url4])
             return
             
-        # If Chrome not found, try with PowerShell instead of cmd.exe
-        print("Chrome not found, trying with PowerShell and default browser...")
+        # If no browser found, try with PowerShell instead of cmd.exe
+        print("No browser found, trying with PowerShell and default browser...")
         
         # Use PowerShell from C drive to avoid UNC path issues
         ps_commands = [
@@ -360,7 +378,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             
         except Exception as e2:
             print(f"Alternative method failed: {e2}")
-            print("Please manually open the following URLs in Windows Chrome:")
+            print("Please manually open the following URLs in Windows browser:")
             print(f"URL 1: {url1}")
             print(f"URL 2: {url2}")
             print(f"URL 3: {url3}")
@@ -369,8 +387,65 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
 def open_urls_wsl(url1, url2, url3, url4):
     """Open URLs when running in WSL environment."""
     try:
-        # Try to use powershell.exe to open URLs in the Windows host's browser
-        print("Opening URLs using Windows host browser...")
+        # Try to find Chrome first
+        print("Looking for browsers in Windows...")
+        
+        # Try to find Chrome in common Windows locations
+        chrome_paths = [
+            '/mnt/c/Program Files/Google/Chrome/Application/chrome.exe',
+            '/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+            '/mnt/c/Users/*/AppData/Local/Google/Chrome/Application/chrome.exe',  # Wildcard path
+        ]
+        
+        browser_path = None
+        browser_name = "Chrome"
+        
+        # Check for Chrome
+        for path in chrome_paths:
+            if '*' not in path and os.path.exists(path):
+                browser_path = path
+                print(f"Found Chrome at: {browser_path}")
+                break
+                
+        # Try wildcard paths for Chrome
+        if not browser_path:
+            for path in chrome_paths:
+                if '*' in path:
+                    matching_paths = glob.glob(path)
+                    if matching_paths:
+                        browser_path = matching_paths[0]
+                        print(f"Found Chrome at: {browser_path}")
+                        break
+        
+        # If Chrome not found, try Microsoft Edge
+        if not browser_path:
+            print("Chrome not found. Looking for Microsoft Edge...")
+            edge_paths = [
+                '/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+                '/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe',
+            ]
+            
+            for path in edge_paths:
+                if os.path.exists(path):
+                    browser_path = path
+                    browser_name = "Edge"
+                    print(f"Found Microsoft Edge at: {browser_path}")
+                    break
+                    
+        # If a browser was found, use it directly
+        if browser_path:
+            print(f"Launching {browser_name}: {browser_path}")
+            subprocess.run([browser_path, url1])
+            time.sleep(1)
+            subprocess.run([browser_path, url2])
+            time.sleep(1)
+            subprocess.run([browser_path, url3])
+            time.sleep(1)
+            subprocess.run([browser_path, url4])
+            return
+            
+        # If no browser found, try to use powershell.exe to open URLs in the Windows host's browser
+        print("No browser found, trying with PowerShell and default browser...")
         
         # Escape quotes in URLs for PowerShell
         ps_url1 = url1.replace('"', '\\"')
@@ -437,12 +512,28 @@ def open_urls_windows(url1, url2, url3, url4):
                 chrome_path = path
                 print(f"Found Chrome at: {chrome_path}")
                 break
+                
+        # If Chrome not found, try to find Edge
+        if not chrome_path:
+            print("Chrome not found. Looking for Microsoft Edge...")
+            edge_paths = [
+                os.path.expandvars("%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"),
+                os.path.expandvars("%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"),
+                # Add more potential paths if needed
+            ]
+            
+            for path in edge_paths:
+                if os.path.exists(path):
+                    chrome_path = path  # Use edge_path but keep the variable name for code reuse
+                    print(f"Found Microsoft Edge at: {chrome_path}")
+                    break
         
         if chrome_path:
-            # Use Chrome directly with window positioning via PowerShell
-            print("Using Chrome with PowerShell for window positioning...")
+            # Use Chrome/Edge directly with window positioning via PowerShell
+            browser_name = "Edge" if "edge" in chrome_path.lower() or "msedge" in chrome_path.lower() else "Chrome"
+            print(f"Using {browser_name} with PowerShell for window positioning...")
             
-            # PowerShell script to open Chrome with specific window positions
+            # PowerShell script to open Chrome/Edge with specific window positions
             ps_script = f'''
             # Get screen dimensions
             Add-Type -AssemblyName System.Windows.Forms
@@ -458,18 +549,18 @@ def open_urls_windows(url1, url2, url3, url4):
             
             Write-Host "Window dimensions will be: $halfWidth x $halfHeight"
             
-            # Chrome path
-            $chromePath = "{chrome_path.replace('\\', '\\\\')}"
+            # Browser path
+            $browserPath = "{chrome_path.replace('\\', '\\\\')}"
             
-            # Function to open Chrome with a URL at a specific position
-            function Open-ChromeAtPosition($Url, $X, $Y, $Width, $Height) {{
-                $chrome = Start-Process $chromePath -ArgumentList "$Url" -PassThru
+            # Function to open browser with a URL at a specific position
+            function Open-BrowserAtPosition($Url, $X, $Y, $Width, $Height) {{
+                $browser = Start-Process $browserPath -ArgumentList "$Url" -PassThru
                 Start-Sleep -Seconds 1
                 
                 # Try to position the window
                 try {{
                     $wshell = New-Object -ComObject wscript.shell
-                    $wshell.AppActivate($chrome.Id)
+                    $wshell.AppActivate($browser.Id)
                     
                     # Move and resize window
                     $wshell.SendKeys('%')
@@ -505,14 +596,14 @@ def open_urls_windows(url1, url2, url3, url4):
                     Write-Host "Error positioning window: $_"
                 }}
                 
-                return $chrome
+                return $browser
             }}
             
-            # Open Chrome windows in a grid
-            $chrome1 = Open-ChromeAtPosition "{url1}" 0 0 $halfWidth $halfHeight
-            $chrome2 = Open-ChromeAtPosition "{url2}" $halfWidth 0 $halfWidth $halfHeight
-            $chrome3 = Open-ChromeAtPosition "{url3}" 0 $halfHeight $halfWidth $halfHeight
-            $chrome4 = Open-ChromeAtPosition "{url4}" $halfWidth $halfHeight $halfWidth $halfHeight
+            # Open browser windows in a grid
+            $browser1 = Open-BrowserAtPosition "{url1}" 0 0 $halfWidth $halfHeight
+            $browser2 = Open-BrowserAtPosition "{url2}" $halfWidth 0 $halfWidth $halfHeight
+            $browser3 = Open-BrowserAtPosition "{url3}" 0 $halfHeight $halfWidth $halfHeight
+            $browser4 = Open-BrowserAtPosition "{url4}" $halfWidth $halfHeight $halfWidth $halfHeight
             
             Write-Host "Windows positioned successfully"
             '''
@@ -522,7 +613,7 @@ def open_urls_windows(url1, url2, url3, url4):
             if not temp_dir:
                 temp_dir = os.getcwd()
             
-            ps_path = os.path.join(temp_dir, 'vl_chrome_windows.ps1')
+            ps_path = os.path.join(temp_dir, 'vl_browser_windows.ps1')
             with open(ps_path, 'w') as f:
                 f.write(ps_script)
             
@@ -535,7 +626,7 @@ def open_urls_windows(url1, url2, url3, url4):
             except:
                 pass
         else:
-            print("Chrome not found. Trying to use default browser...")
+            print("Neither Chrome nor Edge found. Trying to use default browser...")
             # Try to use the default browser through Windows start command
             os.system(f'start "" "{url1}"')
             time.sleep(1)
