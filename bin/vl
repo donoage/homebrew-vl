@@ -328,15 +328,75 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                     break
         
         if browser_path:
-            # Use Windows browser directly
-            print(f"Launching {browser_name}: {browser_path}")
-            subprocess.run([browser_path, url1])
-            time.sleep(1)
-            subprocess.run([browser_path, url2])
-            time.sleep(1)
-            subprocess.run([browser_path, url3])
-            time.sleep(1)
-            subprocess.run([browser_path, url4])
+            # Use Windows browser directly - open all windows first without waiting
+            print(f"Launching {browser_name} windows...")
+            
+            # Start all browser processes without waiting
+            processes = []
+            processes.append(subprocess.Popen([browser_path, url1]))
+            processes.append(subprocess.Popen([browser_path, url2]))
+            processes.append(subprocess.Popen([browser_path, url3]))
+            processes.append(subprocess.Popen([browser_path, url4]))
+            
+            # Give them a moment to start
+            time.sleep(3)
+            
+            # Try to position windows using PowerShell
+            try:
+                print("Positioning windows...")
+                ps_script = f'''
+                Add-Type -AssemblyName System.Windows.Forms
+                $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+                $screenWidth = $screen.Bounds.Width
+                $screenHeight = $screen.Bounds.Height
+                
+                # Calculate half dimensions
+                $halfWidth = $screenWidth / 2
+                $halfHeight = $screenHeight / 2
+                
+                # Get all browser windows
+                $shell = New-Object -ComObject Shell.Application
+                $windows = @($shell.Windows())
+                
+                # Filter for browser windows with our URLs
+                $ourWindows = $windows | Where-Object {{ 
+                    $url = $_.LocationURL
+                    $url -like "*volumeleaders.com/Chart*" 
+                }}
+                
+                Write-Host "Found $($ourWindows.Count) browser windows to position"
+                
+                # Position windows in grid
+                $positions = @(
+                    @(0, 0, $halfWidth, $halfHeight),
+                    @($halfWidth, 0, $screenWidth, $halfHeight),
+                    @(0, $halfHeight, $halfWidth, $screenHeight),
+                    @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+                )
+                
+                $i = 0
+                foreach ($window in $ourWindows) {{
+                    if ($i -lt 4) {{
+                        $pos = $positions[$i]
+                        $window.Left = $pos[0]
+                        $window.Top = $pos[1]
+                        $window.Width = $pos[2] - $pos[0]
+                        $window.Height = $pos[3] - $pos[1]
+                        Write-Host "Positioned window $i"
+                        $i++
+                    }}
+                }}
+                '''
+                
+                # Save and run PowerShell script
+                ps_path = '/tmp/position_windows.ps1'
+                with open(ps_path, 'w') as f:
+                    f.write(ps_script)
+                    
+                subprocess.run(['cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File /mnt/c/Windows/Temp/position_windows.ps1'], shell=True)
+            except Exception as e:
+                print(f"Window positioning failed: {e}")
+                
             return
             
         # If no browser found, try with PowerShell instead of cmd.exe
@@ -357,9 +417,64 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
                 print(f"Running: {full_cmd}")
                 subprocess.run(full_cmd, shell=True)
-                time.sleep(1)
             except Exception as e:
                 print(f"PowerShell command failed: {e}")
+        
+        # Wait a moment and try to position windows
+        time.sleep(3)
+        try:
+            ps_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+            $screenWidth = $screen.Bounds.Width
+            $screenHeight = $screen.Bounds.Height
+            
+            # Calculate half dimensions
+            $halfWidth = $screenWidth / 2
+            $halfHeight = $screenHeight / 2
+            
+            # Get all browser windows
+            $shell = New-Object -ComObject Shell.Application
+            $windows = @($shell.Windows())
+            
+            # Filter for browser windows with our URLs
+            $ourWindows = $windows | Where-Object { 
+                $url = $_.LocationURL
+                $url -like "*volumeleaders.com/Chart*" 
+            }
+            
+            Write-Host "Found $($ourWindows.Count) browser windows to position"
+            
+            # Position windows in grid
+            $positions = @(
+                @(0, 0, $halfWidth, $halfHeight),
+                @($halfWidth, 0, $screenWidth, $halfHeight),
+                @(0, $halfHeight, $halfWidth, $screenHeight),
+                @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+            )
+            
+            $i = 0
+            foreach ($window in $ourWindows) {
+                if ($i -lt 4) {
+                    $pos = $positions[$i]
+                    $window.Left = $pos[0]
+                    $window.Top = $pos[1]
+                    $window.Width = $pos[2] - $pos[0]
+                    $window.Height = $pos[3] - $pos[1]
+                    Write-Host "Positioned window $i"
+                    $i++
+                }
+            }
+            '''
+            
+            # Save and run PowerShell script
+            ps_path = '/tmp/position_windows.ps1'
+            with open(ps_path, 'w') as f:
+                f.write(ps_script)
+                
+            subprocess.run(['cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File /mnt/c/Windows/Temp/position_windows.ps1'], shell=True)
+        except Exception as e:
+            print(f"Window positioning failed: {e}")
         
     except Exception as e:
         print(f"Parallels WSL browser opening method failed: {e}")
@@ -369,11 +484,8 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             # Try with explorer.exe as a last resort, with explicit path
             print("Trying explorer.exe with explicit C: drive path...")
             subprocess.run(["cd /mnt/c && explorer.exe", url1], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url2], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url3], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url4], shell=True)
             
         except Exception as e2:
@@ -434,14 +546,74 @@ def open_urls_wsl(url1, url2, url3, url4):
                     
         # If a browser was found, use it directly
         if browser_path:
-            print(f"Launching {browser_name}: {browser_path}")
-            subprocess.run([browser_path, url1])
-            time.sleep(1)
-            subprocess.run([browser_path, url2])
-            time.sleep(1)
-            subprocess.run([browser_path, url3])
-            time.sleep(1)
-            subprocess.run([browser_path, url4])
+            print(f"Launching {browser_name} windows...")
+            
+            # Start all browser processes without waiting
+            processes = []
+            processes.append(subprocess.Popen([browser_path, url1]))
+            processes.append(subprocess.Popen([browser_path, url2]))
+            processes.append(subprocess.Popen([browser_path, url3]))
+            processes.append(subprocess.Popen([browser_path, url4]))
+            
+            # Give them a moment to start
+            time.sleep(3)
+            
+            # Try to position windows using PowerShell
+            try:
+                print("Positioning windows...")
+                ps_script = f'''
+                Add-Type -AssemblyName System.Windows.Forms
+                $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+                $screenWidth = $screen.Bounds.Width
+                $screenHeight = $screen.Bounds.Height
+                
+                # Calculate half dimensions
+                $halfWidth = $screenWidth / 2
+                $halfHeight = $screenHeight / 2
+                
+                # Get all browser windows
+                $shell = New-Object -ComObject Shell.Application
+                $windows = @($shell.Windows())
+                
+                # Filter for browser windows with our URLs
+                $ourWindows = $windows | Where-Object {{ 
+                    $url = $_.LocationURL
+                    $url -like "*volumeleaders.com/Chart*" 
+                }}
+                
+                Write-Host "Found $($ourWindows.Count) browser windows to position"
+                
+                # Position windows in grid
+                $positions = @(
+                    @(0, 0, $halfWidth, $halfHeight),
+                    @($halfWidth, 0, $screenWidth, $halfHeight),
+                    @(0, $halfHeight, $halfWidth, $screenHeight),
+                    @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+                )
+                
+                $i = 0
+                foreach ($window in $ourWindows) {{
+                    if ($i -lt 4) {{
+                        $pos = $positions[$i]
+                        $window.Left = $pos[0]
+                        $window.Top = $pos[1]
+                        $window.Width = $pos[2] - $pos[0]
+                        $window.Height = $pos[3] - $pos[1]
+                        Write-Host "Positioned window $i"
+                        $i++
+                    }}
+                }}
+                '''
+                
+                # Save and run PowerShell script
+                ps_path = '/tmp/position_windows.ps1'
+                with open(ps_path, 'w') as f:
+                    f.write(ps_script)
+                    
+                subprocess.run(['cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File /mnt/c/Windows/Temp/position_windows.ps1'], shell=True)
+            except Exception as e:
+                print(f"Window positioning failed: {e}")
+                
             return
             
         # If no browser found, try to use powershell.exe to open URLs in the Windows host's browser
@@ -467,9 +639,64 @@ def open_urls_wsl(url1, url2, url3, url4):
                 full_cmd = f"cd /mnt/c && powershell.exe -Command \"{cmd}\""
                 print(f"Running: {full_cmd}")
                 subprocess.run(full_cmd, shell=True)
-                time.sleep(1)
             except Exception as e:
                 print(f"PowerShell command failed: {e}")
+        
+        # Wait a moment and try to position windows
+        time.sleep(3)
+        try:
+            ps_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+            $screenWidth = $screen.Bounds.Width
+            $screenHeight = $screen.Bounds.Height
+            
+            # Calculate half dimensions
+            $halfWidth = $screenWidth / 2
+            $halfHeight = $screenHeight / 2
+            
+            # Get all browser windows
+            $shell = New-Object -ComObject Shell.Application
+            $windows = @($shell.Windows())
+            
+            # Filter for browser windows with our URLs
+            $ourWindows = $windows | Where-Object { 
+                $url = $_.LocationURL
+                $url -like "*volumeleaders.com/Chart*" 
+            }
+            
+            Write-Host "Found $($ourWindows.Count) browser windows to position"
+            
+            # Position windows in grid
+            $positions = @(
+                @(0, 0, $halfWidth, $halfHeight),
+                @($halfWidth, 0, $screenWidth, $halfHeight),
+                @(0, $halfHeight, $halfWidth, $screenHeight),
+                @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+            )
+            
+            $i = 0
+            foreach ($window in $ourWindows) {
+                if ($i -lt 4) {
+                    $pos = $positions[$i]
+                    $window.Left = $pos[0]
+                    $window.Top = $pos[1]
+                    $window.Width = $pos[2] - $pos[0]
+                    $window.Height = $pos[3] - $pos[1]
+                    Write-Host "Positioned window $i"
+                    $i++
+                }
+            }
+            '''
+            
+            # Save and run PowerShell script
+            ps_path = '/tmp/position_windows.ps1'
+            with open(ps_path, 'w') as f:
+                f.write(ps_script)
+                
+            subprocess.run(['cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File /mnt/c/Windows/Temp/position_windows.ps1'], shell=True)
+        except Exception as e:
+            print(f"Window positioning failed: {e}")
         
     except Exception as e:
         print(f"WSL browser opening method failed: {e}")
@@ -479,11 +706,8 @@ def open_urls_wsl(url1, url2, url3, url4):
             # Try with explorer.exe as a last resort, with explicit path
             print("Trying explorer.exe with explicit C: drive path...")
             subprocess.run(["cd /mnt/c && explorer.exe", url1], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url2], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url3], shell=True)
-            time.sleep(1)
             subprocess.run(["cd /mnt/c && explorer.exe", url4], shell=True)
             
         except Exception as e2:
@@ -529,112 +753,160 @@ def open_urls_windows(url1, url2, url3, url4):
                     break
         
         if chrome_path:
-            # Use Chrome/Edge directly with window positioning via PowerShell
+            # Use Chrome/Edge directly
             browser_name = "Edge" if "edge" in chrome_path.lower() or "msedge" in chrome_path.lower() else "Chrome"
-            print(f"Using {browser_name} with PowerShell for window positioning...")
+            print(f"Launching {browser_name} windows...")
             
-            # PowerShell script to open Chrome/Edge with specific window positions
-            ps_script = f'''
-            # Get screen dimensions
-            Add-Type -AssemblyName System.Windows.Forms
-            $screen = [System.Windows.Forms.Screen]::PrimaryScreen
-            $screenWidth = $screen.Bounds.Width
-            $screenHeight = $screen.Bounds.Height
+            # Start all browser processes without waiting
+            processes = []
+            processes.append(subprocess.Popen([chrome_path, url1]))
+            processes.append(subprocess.Popen([chrome_path, url2]))
+            processes.append(subprocess.Popen([chrome_path, url3]))
+            processes.append(subprocess.Popen([chrome_path, url4]))
             
-            Write-Host "Detected screen resolution: $screenWidth x $screenHeight"
+            # Give them a moment to start
+            time.sleep(3)
             
-            # Calculate half dimensions
-            $halfWidth = $screenWidth / 2
-            $halfHeight = $screenHeight / 2
-            
-            Write-Host "Window dimensions will be: $halfWidth x $halfHeight"
-            
-            # Browser path
-            $browserPath = "{chrome_path.replace('\\', '\\\\')}"
-            
-            # Function to open browser with a URL at a specific position
-            function Open-BrowserAtPosition($Url, $X, $Y, $Width, $Height) {{
-                $browser = Start-Process $browserPath -ArgumentList "$Url" -PassThru
-                Start-Sleep -Seconds 1
-                
-                # Try to position the window
-                try {{
-                    $wshell = New-Object -ComObject wscript.shell
-                    $wshell.AppActivate($browser.Id)
-                    
-                    # Move and resize window
-                    $wshell.SendKeys('%')
-                    $wshell.SendKeys(' ')
-                    $wshell.SendKeys('m')
-                    
-                    # Move to position
-                    [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($X, $Y)
-                    Start-Sleep -Milliseconds 100
-                    $wshell.SendKeys('{{LEFT}}')
-                    Start-Sleep -Milliseconds 100
-                    
-                    # Resize window
-                    $wshell.SendKeys('%')
-                    $wshell.SendKeys(' ')
-                    $wshell.SendKeys('s')
-                    
-                    # Set size
-                    $wshell.SendKeys('{{RIGHT}}')
-                    for ($i = 0; $i -lt $Width; $i += 10) {{
-                        $wshell.SendKeys('{{RIGHT}}')
-                        Start-Sleep -Milliseconds 10
-                    }}
-                    
-                    $wshell.SendKeys('{{DOWN}}')
-                    for ($i = 0; $i -lt $Height; $i += 10) {{
-                        $wshell.SendKeys('{{DOWN}}')
-                        Start-Sleep -Milliseconds 10
-                    }}
-                    
-                    $wshell.SendKeys('{{ENTER}}')
-                }} catch {{
-                    Write-Host "Error positioning window: $_"
-                }}
-                
-                return $browser
-            }}
-            
-            # Open browser windows in a grid
-            $browser1 = Open-BrowserAtPosition "{url1}" 0 0 $halfWidth $halfHeight
-            $browser2 = Open-BrowserAtPosition "{url2}" $halfWidth 0 $halfWidth $halfHeight
-            $browser3 = Open-BrowserAtPosition "{url3}" 0 $halfHeight $halfWidth $halfHeight
-            $browser4 = Open-BrowserAtPosition "{url4}" $halfWidth $halfHeight $halfWidth $halfHeight
-            
-            Write-Host "Windows positioned successfully"
-            '''
-            
-            # Save PowerShell script to temp file
-            temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
-            if not temp_dir:
-                temp_dir = os.getcwd()
-            
-            ps_path = os.path.join(temp_dir, 'vl_browser_windows.ps1')
-            with open(ps_path, 'w') as f:
-                f.write(ps_script)
-            
-            # Execute PowerShell script
-            subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path], check=True)
-            
-            # Clean up temp file
+            # Try to position windows using PowerShell
             try:
-                os.remove(ps_path)
-            except:
-                pass
+                print("Positioning windows...")
+                ps_script = '''
+                Add-Type -AssemblyName System.Windows.Forms
+                $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+                $screenWidth = $screen.Bounds.Width
+                $screenHeight = $screen.Bounds.Height
+                
+                # Calculate half dimensions
+                $halfWidth = $screenWidth / 2
+                $halfHeight = $screenHeight / 2
+                
+                # Get all browser windows
+                $shell = New-Object -ComObject Shell.Application
+                $windows = @($shell.Windows())
+                
+                # Filter for browser windows with our URLs
+                $ourWindows = $windows | Where-Object { 
+                    $url = $_.LocationURL
+                    $url -like "*volumeleaders.com/Chart*" 
+                }
+                
+                Write-Host "Found $($ourWindows.Count) browser windows to position"
+                
+                # Position windows in grid
+                $positions = @(
+                    @(0, 0, $halfWidth, $halfHeight),
+                    @($halfWidth, 0, $screenWidth, $halfHeight),
+                    @(0, $halfHeight, $halfWidth, $screenHeight),
+                    @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+                )
+                
+                $i = 0
+                foreach ($window in $ourWindows) {
+                    if ($i -lt 4) {
+                        $pos = $positions[$i]
+                        $window.Left = $pos[0]
+                        $window.Top = $pos[1]
+                        $window.Width = $pos[2] - $pos[0]
+                        $window.Height = $pos[3] - $pos[1]
+                        Write-Host "Positioned window $i"
+                        $i++
+                    }
+                }
+                '''
+                
+                # Save PowerShell script to temp file
+                temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
+                if not temp_dir:
+                    temp_dir = os.getcwd()
+                
+                ps_path = os.path.join(temp_dir, 'vl_browser_windows.ps1')
+                with open(ps_path, 'w') as f:
+                    f.write(ps_script)
+                
+                # Execute PowerShell script
+                subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path], check=True)
+                
+                # Clean up temp file
+                try:
+                    os.remove(ps_path)
+                except:
+                    pass
+            except Exception as e:
+                print(f"Window positioning failed: {e}")
         else:
             print("Neither Chrome nor Edge found. Trying to use default browser...")
             # Try to use the default browser through Windows start command
             os.system(f'start "" "{url1}"')
-            time.sleep(1)
             os.system(f'start "" "{url2}"')
-            time.sleep(1)
             os.system(f'start "" "{url3}"')
-            time.sleep(1)
             os.system(f'start "" "{url4}"')
+            
+            # Wait a moment and try to position windows
+            time.sleep(3)
+            try:
+                ps_script = '''
+                Add-Type -AssemblyName System.Windows.Forms
+                $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+                $screenWidth = $screen.Bounds.Width
+                $screenHeight = $screen.Bounds.Height
+                
+                # Calculate half dimensions
+                $halfWidth = $screenWidth / 2
+                $halfHeight = $screenHeight / 2
+                
+                # Get all browser windows
+                $shell = New-Object -ComObject Shell.Application
+                $windows = @($shell.Windows())
+                
+                # Filter for browser windows with our URLs
+                $ourWindows = $windows | Where-Object { 
+                    $url = $_.LocationURL
+                    $url -like "*volumeleaders.com/Chart*" 
+                }
+                
+                Write-Host "Found $($ourWindows.Count) browser windows to position"
+                
+                # Position windows in grid
+                $positions = @(
+                    @(0, 0, $halfWidth, $halfHeight),
+                    @($halfWidth, 0, $screenWidth, $halfHeight),
+                    @(0, $halfHeight, $halfWidth, $screenHeight),
+                    @($halfWidth, $halfHeight, $screenWidth, $screenHeight)
+                )
+                
+                $i = 0
+                foreach ($window in $ourWindows) {
+                    if ($i -lt 4) {
+                        $pos = $positions[$i]
+                        $window.Left = $pos[0]
+                        $window.Top = $pos[1]
+                        $window.Width = $pos[2] - $pos[0]
+                        $window.Height = $pos[3] - $pos[1]
+                        Write-Host "Positioned window $i"
+                        $i++
+                    }
+                }
+                '''
+                
+                # Save PowerShell script to temp file
+                temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
+                if not temp_dir:
+                    temp_dir = os.getcwd()
+                
+                ps_path = os.path.join(temp_dir, 'vl_browser_windows.ps1')
+                with open(ps_path, 'w') as f:
+                    f.write(ps_script)
+                
+                # Execute PowerShell script
+                subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path], check=True)
+                
+                # Clean up temp file
+                try:
+                    os.remove(ps_path)
+                except:
+                    pass
+            except Exception as e:
+                print(f"Window positioning failed: {e}")
             
     except Exception as e:
         print(f"Windows browser opening method failed: {e}")
@@ -642,11 +914,8 @@ def open_urls_windows(url1, url2, url3, url4):
         
         # Fallback to simple method with webbrowser module
         webbrowser.open(url1)
-        time.sleep(1)
         webbrowser.open(url2)
-        time.sleep(1)
         webbrowser.open(url3)
-        time.sleep(1)
         webbrowser.open(url4)
 
 def open_urls_default(url1, url2, url3, url4):
