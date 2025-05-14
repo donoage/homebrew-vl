@@ -470,7 +470,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                 process_ids_str = ','.join(str(pid) for pid in window_ids)
                 
                 # Run the script from Windows
-                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File {win_path} {process_ids_str}"
+                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File \"{win_path}\" {process_ids_str}"
                 subprocess.run(cmd, shell=True)
                 
                 # Clean up temporary files
@@ -587,21 +587,61 @@ def open_urls_windows(url1, url2, url3, url4):
                         if ($process) {{ $windows += $process }};
                     }}
                     
-                    # Update each window with a new URL
-                    $i = 0;
-                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
-                    foreach ($window in $windows) {{
-                        if ($i -lt $urls.Length) {{
-                            Start-Process $urls[$i] -WindowStyle Normal;
-                            Start-Sleep -Milliseconds 500;
-                            $i++;
+                    # Get the browser process name
+                    $browserName = "";
+                    if ($windows.Count -gt 0) {{
+                        if ($windows[0].Name -eq "chrome") {{
+                            $browserName = "chrome";
+                        }} else {{
+                            $browserName = "msedge";
                         }}
                     }}
                     
-                    # Create additional windows if needed
-                    for (; $i -lt $urls.Length; $i++) {{
-                        Start-Process $urls[$i] -WindowStyle Normal;
-                        Start-Sleep -Milliseconds 500;
+                    # Create automation script to navigate existing windows
+                    if ($browserName -ne "") {{
+                        Add-Type -AssemblyName System.Windows.Forms;
+                        # URLs to navigate to
+                        $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                        
+                        # Get all browser windows
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        
+                        # For each window we found
+                        for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
+                            # Focus the window
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            $allWindows[$i].MainWindowHandle | Out-Null;
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            
+                            # Force it to the foreground
+                            $signature = @"
+                            [DllImport("user32.dll")]
+                            public static extern bool SetForegroundWindow(IntPtr hWnd);
+"@
+                            Add-Type -MemberDefinition $signature -Name SetForegroundWindow -Namespace Win32;
+                            [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
+                            
+                            # Wait a moment
+                            Start-Sleep -Milliseconds 300;
+                            
+                            # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
+                            [System.Windows.Forms.SendKeys]::SendWait("^l");
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
+                            Start-Sleep -Milliseconds 500;
+                        }}
+                        
+                        # Create additional windows if needed
+                        for ($i = $allWindows.Count; $i -lt $urls.Count; $i++) {{
+                            if ($browserName -eq "chrome") {{
+                                Start-Process "chrome" -ArgumentList "--new-window", $urls[$i];
+                            }} else {{
+                                Start-Process "msedge" -ArgumentList "--new-window", $urls[$i];
+                            }}
+                            Start-Sleep -Milliseconds 800;
+                        }}
                     }}
                     
                     # Return process IDs for all windows
@@ -771,21 +811,61 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                         if ($process) {{ $windows += $process }};
                     }}
                     
-                    # Update each window with a new URL
-                    $i = 0;
-                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
-                    foreach ($window in $windows) {{
-                        if ($i -lt $urls.Length) {{
-                            Start-Process $urls[$i] -WindowStyle Normal;
-                            Start-Sleep -Milliseconds 500;
-                            $i++;
+                    # Get the browser process name
+                    $browserName = "";
+                    if ($windows.Count -gt 0) {{
+                        if ($windows[0].Name -eq "chrome") {{
+                            $browserName = "chrome";
+                        }} else {{
+                            $browserName = "msedge";
                         }}
                     }}
                     
-                    # Create additional windows if needed
-                    for (; $i -lt $urls.Length; $i++) {{
-                        Start-Process $urls[$i] -WindowStyle Normal;
-                        Start-Sleep -Milliseconds 500;
+                    # Create automation script to navigate existing windows
+                    if ($browserName -ne "") {{
+                        Add-Type -AssemblyName System.Windows.Forms;
+                        # URLs to navigate to
+                        $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                        
+                        # Get all browser windows
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        
+                        # For each window we found
+                        for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
+                            # Focus the window
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            $allWindows[$i].MainWindowHandle | Out-Null;
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            
+                            # Force it to the foreground
+                            $signature = @"
+                            [DllImport("user32.dll")]
+                            public static extern bool SetForegroundWindow(IntPtr hWnd);
+"@
+                            Add-Type -MemberDefinition $signature -Name SetForegroundWindow -Namespace Win32;
+                            [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
+                            
+                            # Wait a moment
+                            Start-Sleep -Milliseconds 300;
+                            
+                            # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
+                            [System.Windows.Forms.SendKeys]::SendWait("^l");
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
+                            Start-Sleep -Milliseconds 500;
+                        }}
+                        
+                        # Create additional windows if needed
+                        for ($i = $allWindows.Count; $i -lt $urls.Count; $i++) {{
+                            if ($browserName -eq "chrome") {{
+                                Start-Process "chrome" -ArgumentList "--new-window", $urls[$i];
+                            }} else {{
+                                Start-Process "msedge" -ArgumentList "--new-window", $urls[$i];
+                            }}
+                            Start-Sleep -Milliseconds 800;
+                        }}
                     }}
                     
                     # Return process IDs for all windows
@@ -984,21 +1064,61 @@ def open_urls_wsl(url1, url2, url3, url4):
                         if ($process) {{ $windows += $process }};
                     }}
                     
-                    # Update each window with a new URL
-                    $i = 0;
-                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
-                    foreach ($window in $windows) {{
-                        if ($i -lt $urls.Length) {{
-                            Start-Process $urls[$i] -WindowStyle Normal;
-                            Start-Sleep -Milliseconds 500;
-                            $i++;
+                    # Get the browser process name
+                    $browserName = "";
+                    if ($windows.Count -gt 0) {{
+                        if ($windows[0].Name -eq "chrome") {{
+                            $browserName = "chrome";
+                        }} else {{
+                            $browserName = "msedge";
                         }}
                     }}
                     
-                    # Create additional windows if needed
-                    for (; $i -lt $urls.Length; $i++) {{
-                        Start-Process $urls[$i] -WindowStyle Normal;
-                        Start-Sleep -Milliseconds 500;
+                    # Create automation script to navigate existing windows
+                    if ($browserName -ne "") {{
+                        Add-Type -AssemblyName System.Windows.Forms;
+                        # URLs to navigate to
+                        $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                        
+                        # Get all browser windows
+                        $allWindows = Get-Process -Name $browserName | Where-Object {{ $_.MainWindowTitle -like "*volumeleaders*" }};
+                        
+                        # For each window we found
+                        for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
+                            # Focus the window
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            $allWindows[$i].MainWindowHandle | Out-Null;
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            
+                            # Force it to the foreground
+                            $signature = @"
+                            [DllImport("user32.dll")]
+                            public static extern bool SetForegroundWindow(IntPtr hWnd);
+"@
+                            Add-Type -MemberDefinition $signature -Name SetForegroundWindow -Namespace Win32;
+                            [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
+                            
+                            # Wait a moment
+                            Start-Sleep -Milliseconds 300;
+                            
+                            # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
+                            [System.Windows.Forms.SendKeys]::SendWait("^l");
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
+                            Start-Sleep -Milliseconds 100;
+                            [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
+                            Start-Sleep -Milliseconds 500;
+                        }}
+                        
+                        # Create additional windows if needed
+                        for ($i = $allWindows.Count; $i -lt $urls.Count; $i++) {{
+                            if ($browserName -eq "chrome") {{
+                                Start-Process "chrome" -ArgumentList "--new-window", $urls[$i];
+                            }} else {{
+                                Start-Process "msedge" -ArgumentList "--new-window", $urls[$i];
+                            }}
+                            Start-Sleep -Milliseconds 800;
+                        }}
                     }}
                     
                     # Return process IDs for all windows
