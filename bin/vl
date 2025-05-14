@@ -457,31 +457,25 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         else:  # WSL or other Linux
             # For WSL, create a temporary file in the user's home directory
             try:
-                home_dir = os.path.expanduser("~")
-                temp_file = os.path.join(home_dir, f'vl_position_windows_{time.time()}.ps1')
+                # Use Public directory in Windows which should be writable
+                ps_file_name = f'vl_position_{time.time()}.ps1'
+                win_path = f"C:\\Users\\Public\\{ps_file_name}"
+                wsl_win_path = f"/mnt/c/Users/Public/{ps_file_name}"
                 
-                # Write the script to a location that should be writable
-                with open(temp_file, 'w') as f:
+                # Write directly to Windows accessible location
+                with open(wsl_win_path, 'w') as f:
                     f.write(ps_script)
                 
                 # Format process IDs as comma-separated string
                 process_ids_str = ','.join(str(pid) for pid in window_ids)
                 
-                # Create a Windows path for the script
-                win_path = f"C:\\Users\\Public\\vl_position_{time.time()}.ps1"
-                
-                # First copy our script to a location Windows can access
-                copy_cmd = f"cp {temp_file} /mnt/c/Users/Public/vl_position_{time.time()}.ps1"
-                subprocess.run(copy_cmd, shell=True)
-                
-                # Now run the script from Windows
+                # Run the script from Windows
                 cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File {win_path} {process_ids_str}"
                 subprocess.run(cmd, shell=True)
                 
                 # Clean up temporary files
                 try:
-                    os.remove(temp_file)
-                    subprocess.run(f"rm /mnt/c/Users/Public/vl_position_{time.time()}.ps1", shell=True)
+                    os.remove(wsl_win_path)
                 except:
                     pass
             except Exception as e:
