@@ -1,78 +1,180 @@
 #!/bin/bash
 
-# Check if a ticker is provided
-if [ -z "$1" ]; then
+# Check if ticker argument is provided
+if [ $# -eq 0 ]; then
     echo "Usage: vl TICKER"
     echo "Example: vl AAPL"
     exit 1
 fi
 
-# Use the provided ticker
-TICKER="$1"
+# Get the ticker from command line argument
+TICKER=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+echo "Using ticker: $TICKER"
 
-# Calculate dates: start date (90 days ago) and end date (today)
-START_DATE=$(date -v-90d +%Y-%m-%d)
-END_DATE=$(date +%Y-%m-%d)
+# Get today's date in YYYY-MM-DD format
+TODAY=$(date +"%Y-%m-%d")
+echo "Using today's date: $TODAY"
 
-# Calculate date for 30 days ago
-START_DATE_30=$(date -v-30d +%Y-%m-%d)
+# Calculate dates for different timeframes
+THREE_MONTHS_AGO=$(date -v-3m +"%Y-%m-%d")
+ONE_MONTH_AGO=$(date -v-1m +"%Y-%m-%d")
+ONE_WEEK_AGO=$(date -v-7d +"%Y-%m-%d")
 
-# URL for the chart on VolumeLeaders
-URL="https://www.volumeleaders.com/Chart?\
-StartDate=${START_DATE}&\
-EndDate=${END_DATE}&\
-Ticker=${TICKER}&\
-MinVolume=0&\
-MaxVolume=2000000000&\
-MinDollars=500000&\
-MaxDollars=300000000000&\
-MinPrice=0&\
-MaxPrice=100000&\
-DarkPools=-1&\
-Sweeps=-1&\
-LatePrints=-1&\
-SignaturePrints=0&\
-VolumeProfile=0&\
-Levels=5&\
-TradeCount=5&\
-VCD=0&\
-TradeRank=-1&\
-IncludePremarket=1&\
-IncludeRTH=1&\
-IncludeAH=1&\
-IncludeOpening=1&\
-IncludeClosing=1&\
-IncludePhantom=1&\
-IncludeOffsetting=1"
+# Use screen resolution of 2880x1600
+SCREEN_WIDTH=2880
+SCREEN_HEIGHT=1600
 
-# Second URL with DarkPools=1 and Sweeps=1 and 30 days lookback
-URL2="https://www.volumeleaders.com/Chart?\
-StartDate=${START_DATE_30}&\
-EndDate=${END_DATE}&\
-Ticker=${TICKER}&\
-MinVolume=0&\
-MaxVolume=2000000000&\
-MinDollars=500000&\
-MaxDollars=300000000000&\
-MinPrice=0&\
-MaxPrice=100000&\
-DarkPools=1&\
-Sweeps=1&\
-LatePrints=-1&\
-SignaturePrints=0&\
-VolumeProfile=0&\
-Levels=5&\
-TradeCount=5&\
-VCD=0&\
-TradeRank=-1&\
-IncludePremarket=1&\
-IncludeRTH=1&\
-IncludeAH=1&\
-IncludeOpening=1&\
-IncludeClosing=1&\
-IncludePhantom=1&\
-IncludeOffsetting=1"
+# Calculate half width and height
+HALF_WIDTH=$((SCREEN_WIDTH / 2))
+HALF_HEIGHT=$((SCREEN_HEIGHT / 2))
 
-# Open the URLs in Chrome
-open -a "Google Chrome" "$URL"
-open -a "Google Chrome" "$URL2" 
+echo "Using screen resolution: ${SCREEN_WIDTH}x${SCREEN_HEIGHT}"
+echo "Window dimensions will be: ${HALF_WIDTH}x${HALF_HEIGHT}"
+
+# Construct URLs with the provided ticker and today's date
+URL1="https://www.volumeleaders.com/Chart?StartDate=${THREE_MONTHS_AGO}&EndDate=${TODAY}&Ticker=${TICKER}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+
+URL2="https://www.volumeleaders.com/Chart?StartDate=${ONE_MONTH_AGO}&EndDate=${TODAY}&Ticker=${TICKER}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+
+URL3="https://www.volumeleaders.com/Chart?StartDate=${ONE_MONTH_AGO}&EndDate=${TODAY}&Ticker=${TICKER}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+
+URL4="https://www.volumeleaders.com/Chart?StartDate=${ONE_WEEK_AGO}&EndDate=${TODAY}&Ticker=${TICKER}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+
+# Make sure Chrome is running
+open -a "Google Chrome"
+sleep 1
+
+# Check if VolumeLeaders windows already exist and how many there are
+WINDOW_COUNT=$(osascript <<EOF
+try
+    tell application "Google Chrome"
+        set vlWindows to {}
+        repeat with w in windows
+            try
+                set winURL to URL of active tab of w
+                if winURL contains "volumeleaders.com/Chart" then
+                    set end of vlWindows to w
+                end if
+            on error
+                # Skip if we can't get the URL
+            end try
+        end repeat
+        return (count of vlWindows)
+    end tell
+on error
+    return 0
+end try
+EOF
+)
+
+# If we found at least 1 VolumeLeaders window, try to reuse them
+if [ "$WINDOW_COUNT" -ge 1 ]; then
+    echo "Found $WINDOW_COUNT existing VolumeLeaders windows. Updating them..."
+    
+    # Update the windows by finding the VolumeLeaders windows and updating them
+    osascript <<EOF
+    try
+        tell application "Google Chrome"
+            # Find all VolumeLeaders windows
+            set vlWindows to {}
+            repeat with w in windows
+                try
+                    set winURL to URL of active tab of w
+                    if winURL contains "volumeleaders.com/Chart" then
+                        set end of vlWindows to w
+                    end if
+                on error
+                    # Skip if we can't get the URL
+                end try
+            end repeat
+            
+            # Update VolumeLeaders windows, up to 4
+            set windowCount to count of vlWindows
+            
+            # If we have at least 1 window, update it and position as window 1
+            if windowCount >= 1 then
+                set w to item 1 of vlWindows
+                set bounds of w to {0, 23, $HALF_WIDTH, $HALF_HEIGHT}
+                tell active tab of w to set URL to "$URL1"
+            end if
+            
+            # If we have at least 2 windows, update the 2nd one
+            if windowCount >= 2 then
+                set w to item 2 of vlWindows
+                set bounds of w to {$HALF_WIDTH, 23, $SCREEN_WIDTH, $HALF_HEIGHT}
+                tell active tab of w to set URL to "$URL2"
+            end if
+            
+            # If we have at least 3 windows, update the 3rd one
+            if windowCount >= 3 then
+                set w to item 3 of vlWindows
+                set bounds of w to {0, $HALF_HEIGHT, $HALF_WIDTH, $SCREEN_HEIGHT}
+                tell active tab of w to set URL to "$URL3"
+            end if
+            
+            # If we have at least 4 windows, update the 4th one
+            if windowCount >= 4 then
+                set w to item 4 of vlWindows
+                set bounds of w to {$HALF_WIDTH, $HALF_HEIGHT, $SCREEN_WIDTH, $SCREEN_HEIGHT}
+                tell active tab of w to set URL to "$URL4"
+            end if
+            
+            # Create any additional windows we need (if we found fewer than 4)
+            if windowCount < 4 then
+                # Create window 2 if needed
+                if windowCount < 2 then
+                    make new window with properties {bounds:{$HALF_WIDTH, 23, $SCREEN_WIDTH, $HALF_HEIGHT}}
+                    tell active tab of front window to set URL to "$URL2"
+                    delay 0.5
+                end if
+                
+                # Create window 3 if needed
+                if windowCount < 3 then
+                    make new window with properties {bounds:{0, $HALF_HEIGHT, $HALF_WIDTH, $SCREEN_HEIGHT}}
+                    tell active tab of front window to set URL to "$URL3"
+                    delay 0.5
+                end if
+                
+                # Create window 4 if needed
+                if windowCount < 4 then
+                    make new window with properties {bounds:{$HALF_WIDTH, $HALF_HEIGHT, $SCREEN_WIDTH, $SCREEN_HEIGHT}}
+                    tell active tab of front window to set URL to "$URL4"
+                end if
+            end if
+        end tell
+    on error errMsg
+        return "ERROR: " & errMsg
+    end try
+EOF
+    
+    echo "Updated chart windows for $TICKER"
+else
+    # No existing windows found, create new ones
+    echo "Creating new chart windows for $TICKER..."
+    
+    # Create 4 empty windows first
+    osascript <<EOF
+    tell application "Google Chrome"
+        # Window 1: Top-Left - 3 month chart
+        make new window with properties {bounds:{0, 23, $HALF_WIDTH, $HALF_HEIGHT}}
+        tell active tab of front window to set URL to "$URL1"
+        delay 0.5
+        
+        # Window 2: Top-Right - 1 month chart with dark pools and sweeps
+        make new window with properties {bounds:{$HALF_WIDTH, 23, $SCREEN_WIDTH, $HALF_HEIGHT}}
+        tell active tab of front window to set URL to "$URL2"
+        delay 0.5
+        
+        # Window 3: Bottom-Left - 1 month chart
+        make new window with properties {bounds:{0, $HALF_HEIGHT, $HALF_WIDTH, $SCREEN_HEIGHT}}
+        tell active tab of front window to set URL to "$URL3"
+        delay 0.5
+        
+        # Window 4: Bottom-Right - 1 week chart with dark pools and sweeps
+        make new window with properties {bounds:{$HALF_WIDTH, $HALF_HEIGHT, $SCREEN_WIDTH, $SCREEN_HEIGHT}}
+        tell active tab of front window to set URL to "$URL4"
+    end tell
+EOF
+
+    echo "Successfully created chart windows for $TICKER"
+fi 

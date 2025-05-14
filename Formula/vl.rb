@@ -1,9 +1,9 @@
 class Vl < Formula
   desc "Command-line tool to display stock volume leaders"
   homepage "https://github.com/donoage/homebrew-vl"
-  url "https://raw.githubusercontent.com/donoage/homebrew-vl/v1.0.8/bin/vl"
-  sha256 "21946108badbcc4cd2f92f997bccf0577c0c97163a6bfcf02df321845836bf36"
-  version "1.0.8"
+  url "https://raw.githubusercontent.com/donoage/homebrew-vl/v1.1.0/bin/vl"
+  sha256 "d2df7d65c73bacc5bb0c62a8c8ff984248067d99f3f5aed1608feb35be910bb7"
+  version "1.1.0"
 
   def install
     bin.install "vl"
