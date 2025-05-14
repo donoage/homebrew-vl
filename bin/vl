@@ -434,40 +434,84 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         }
         '''
         
-        # Save script to a file
-        if not temp_dir:
-            if os.name == 'nt':  # Windows
-                temp_dir = os.environ.get('TEMP')
-            else:
-                temp_dir = '/tmp'
+        # Create a unique script name and directory that's definitely writable in WSL
+        import tempfile
+        
+        if os.name == 'nt':  # Windows
+            temp_dir = os.environ.get('TEMP')
+            ps_path = os.path.join(temp_dir, f'vl_position_windows_{time.time()}.ps1')
+            with open(ps_path, 'w') as f:
+                f.write(ps_script)
                 
-        # Create a unique script name
-        ps_path = os.path.join(temp_dir, f'vl_position_windows_{time.time()}.ps1')
-        
-        with open(ps_path, 'w') as f:
-            f.write(ps_script)
-        
-        # Format process IDs as comma-separated string
-        process_ids_str = ','.join(str(pid) for pid in window_ids)
-        
-        # Run PowerShell script with process IDs as argument
-        if os.name == 'nt':  # Native Windows
-            subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path, process_ids_str], check=True)
-        else:  # WSL
-            # For WSL, copy the script to Windows temp and run from there
-            win_temp = '/mnt/c/Windows/Temp'
-            win_path = os.path.join(win_temp, os.path.basename(ps_path))
-            shutil.copy2(ps_path, win_path)
-            win_path_arg = win_path.replace('/mnt/c', 'C:').replace('/', '\\')
+            # Format process IDs as comma-separated string
+            process_ids_str = ','.join(str(pid) for pid in window_ids)
             
-            cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File {win_path} {process_ids_str}"
-            subprocess.run(cmd, shell=True)
-        
-        # Clean up the script file
-        try:
-            os.remove(ps_path)
-        except:
-            pass
+            # Run PowerShell script with process IDs as argument
+            subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path, process_ids_str], check=True)
+            
+            # Clean up the script file
+            try:
+                os.remove(ps_path)
+            except:
+                pass
+        else:  # WSL or other Linux
+            # For WSL, create a temporary file in the user's home directory
+            try:
+                home_dir = os.path.expanduser("~")
+                temp_file = os.path.join(home_dir, f'vl_position_windows_{time.time()}.ps1')
+                
+                # Write the script to a location that should be writable
+                with open(temp_file, 'w') as f:
+                    f.write(ps_script)
+                
+                # Format process IDs as comma-separated string
+                process_ids_str = ','.join(str(pid) for pid in window_ids)
+                
+                # Create a Windows path for the script
+                win_path = f"C:\\Users\\Public\\vl_position_{time.time()}.ps1"
+                
+                # First copy our script to a location Windows can access
+                copy_cmd = f"cp {temp_file} /mnt/c/Users/Public/vl_position_{time.time()}.ps1"
+                subprocess.run(copy_cmd, shell=True)
+                
+                # Now run the script from Windows
+                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File {win_path} {process_ids_str}"
+                subprocess.run(cmd, shell=True)
+                
+                # Clean up temporary files
+                try:
+                    os.remove(temp_file)
+                    subprocess.run(f"rm /mnt/c/Users/Public/vl_position_{time.time()}.ps1", shell=True)
+                except:
+                    pass
+            except Exception as e:
+                print(f"Error with WSL window positioning approach 1: {e}")
+                print("Trying alternative approach for window positioning...")
+                
+                # Fallback to direct PowerShell command instead of script file
+                try:
+                    # Much simpler approach that just moves windows to four quadrants
+                    ps_cmd = '''
+                    Add-Type -AssemblyName System.Windows.Forms;
+                    $screen = [System.Windows.Forms.Screen]::PrimaryScreen;
+                    $w = $screen.Bounds.Width/2; $h = $screen.Bounds.Height/2;
+                    $windows = (Get-Process | Where-Object {$_.MainWindowTitle -ne "" -and $_.Id -in @args[0].Split(",")}).MainWindow;
+                    for ($i=0; $i -lt $windows.Count -and $i -lt 4; $i++) {
+                        $pos = @(@(0,0,$w,$h), @($w,0,$screen.Bounds.Width,$h), @(0,$h,$w,$screen.Bounds.Height), @($w,$h,$screen.Bounds.Width,$screen.Bounds.Height))[$i];
+                        $windows[$i].Left = $pos[0]; $windows[$i].Top = $pos[1];
+                        $windows[$i].Width = $pos[2]-$pos[0]; $windows[$i].Height = $pos[3]-$pos[1];
+                    }
+                    '''
+                    
+                    # Format process IDs as comma-separated string
+                    process_ids_str = ','.join(str(pid) for pid in window_ids)
+                    
+                    # Run PowerShell command directly
+                    cmd = f'cd /mnt/c && powershell.exe -Command "{ps_cmd}" "{process_ids_str}"'
+                    subprocess.run(cmd, shell=True)
+                except Exception as e2:
+                    print(f"Alternative window positioning also failed: {e2}")
+                    print("Window positioning could not be completed")
             
         return True
     except Exception as e:
@@ -511,9 +555,93 @@ def open_urls_windows(url1, url2, url3, url4):
         if chrome_path:
             # Use Chrome/Edge directly
             browser_name = "Edge" if "edge" in chrome_path.lower() or "msedge" in chrome_path.lower() else "Chrome"
-            print(f"Launching {browser_name} windows...")
+            print(f"Using {browser_name} to open VolumeLeaders...")
+            
+            # Check for existing VolumeLeaders windows
+            try:
+                # Create PowerShell command to find existing windows
+                ps_cmd = '''
+                $browsers = @();
+                try {
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                try {
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                if ($browsers.Count -gt 0) { 
+                    # Return process IDs as CSV
+                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
+                } else { 
+                    return "" 
+                }
+                '''
+                
+                # Run PowerShell command
+                result = subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True, text=True)
+                
+                existing_browser_pids = result.stdout.strip()
+                
+                if existing_browser_pids:
+                    print(f"Found existing VolumeLeaders windows with process IDs: {existing_browser_pids}")
+                    
+                    # Create PowerShell command to navigate existing windows
+                    update_cmd = f'''
+                    $browserPids = "{existing_browser_pids}".Split(",");
+                    $windows = @();
+                    foreach ($pid in $browserPids) {{
+                        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
+                        if ($process) {{ $windows += $process }};
+                    }}
+                    
+                    # Update each window with a new URL
+                    $i = 0;
+                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                    foreach ($window in $windows) {{
+                        if ($i -lt $urls.Length) {{
+                            Start-Process $urls[$i] -WindowStyle Normal;
+                            Start-Sleep -Milliseconds 500;
+                            $i++;
+                        }}
+                    }}
+                    
+                    # Create additional windows if needed
+                    for (; $i -lt $urls.Length; $i++) {{
+                        Start-Process $urls[$i] -WindowStyle Normal;
+                        Start-Sleep -Milliseconds 500;
+                    }}
+                    
+                    # Return process IDs for all windows
+                    $new_processes = @();
+                    try {{
+                        $new_processes += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    try {{
+                        $new_processes += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    return [string]::Join(",", ($new_processes | ForEach-Object {{ $_.Id }}))
+                    '''
+                    
+                    result = subprocess.run(["powershell", "-Command", update_cmd], capture_output=True, text=True)
+                    
+                    new_pids = result.stdout.strip().split(',')
+                    print(f"Updated windows with process IDs: {new_pids}")
+                    
+                    # Position windows
+                    try:
+                        print("Positioning windows...")
+                        temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
+                        position_windows_powershell([int(pid) for pid in new_pids if pid], chrome_path, [url1, url2, url3, url4], temp_dir)
+                    except Exception as e:
+                        print(f"Window positioning failed: {e}")
+                    
+                    return
+            
+            except Exception as e:
+                print(f"Error checking existing windows: {e}")
+                print("Continuing with new windows...")
             
             # Start all browser processes and collect their PIDs
+            print(f"Launching new {browser_name} windows...")
             processes = []
             processes.append(subprocess.Popen([chrome_path, "--new-window", url1]))
             time.sleep(1)  # Give first window time to fully initialize
@@ -612,6 +740,90 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                     break
         
         if browser_path:
+            # Check for existing VolumeLeaders windows
+            try:
+                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
+                ps_cmd = '''
+                $browsers = @();
+                try {
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                try {
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                if ($browsers.Count -gt 0) { 
+                    # Return process IDs as CSV
+                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
+                } else { 
+                    return "" 
+                }
+                '''
+                
+                # Run the PowerShell command from WSL
+                cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                
+                existing_browser_pids = result.stdout.strip()
+                
+                if existing_browser_pids:
+                    print(f"Found existing VolumeLeaders windows with process IDs: {existing_browser_pids}")
+                    
+                    # Create a PowerShell command to navigate existing windows
+                    update_cmd = f'''
+                    $browserPids = "{existing_browser_pids}".Split(",");
+                    $windows = @();
+                    foreach ($pid in $browserPids) {{
+                        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
+                        if ($process) {{ $windows += $process }};
+                    }}
+                    
+                    # Update each window with a new URL
+                    $i = 0;
+                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                    foreach ($window in $windows) {{
+                        if ($i -lt $urls.Length) {{
+                            Start-Process $urls[$i] -WindowStyle Normal;
+                            Start-Sleep -Milliseconds 500;
+                            $i++;
+                        }}
+                    }}
+                    
+                    # Create additional windows if needed
+                    for (; $i -lt $urls.Length; $i++) {{
+                        Start-Process $urls[$i] -WindowStyle Normal;
+                        Start-Sleep -Milliseconds 500;
+                    }}
+                    
+                    # Return process IDs for all windows
+                    $new_processes = @();
+                    try {{
+                        $new_processes += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    try {{
+                        $new_processes += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    return [string]::Join(",", ($new_processes | ForEach-Object {{ $_.Id }}))
+                    '''
+                    
+                    cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                    
+                    new_pids = result.stdout.strip().split(',')
+                    print(f"Updated windows with process IDs: {new_pids}")
+                    
+                    # Position windows
+                    try:
+                        print("Positioning windows...")
+                        position_windows_powershell([int(pid) for pid in new_pids if pid], browser_path, [url1, url2, url3, url4])
+                    except Exception as e:
+                        print(f"Window positioning failed: {e}")
+                    
+                    return
+            
+            except Exception as e:
+                print(f"Error checking existing windows: {e}")
+                print("Continuing with new windows...")
+            
             # Use Windows browser directly - open all windows first without waiting
             print(f"Launching {browser_name} windows...")
             
@@ -736,9 +948,96 @@ def open_urls_wsl(url1, url2, url3, url4):
                     browser_name = "Edge"
                     print(f"Found Microsoft Edge at: {browser_path}")
                     break
-                    
-        # If a browser was found, use it directly
+        
+        # If a browser was found, check for existing windows
         if browser_path:
+            print(f"Checking for existing {browser_name} windows...")
+            
+            # Try to detect existing VolumeLeaders windows using PowerShell
+            try:
+                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
+                ps_cmd = '''
+                $browsers = @();
+                try {
+                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                try {
+                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like "*volumeleaders*"};
+                } catch {};
+                if ($browsers.Count -gt 0) { 
+                    # Return process IDs as CSV
+                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
+                } else { 
+                    return "" 
+                }
+                '''
+                
+                # Run the PowerShell command
+                cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                
+                existing_browser_pids = result.stdout.strip()
+                
+                if existing_browser_pids:
+                    print(f"Found existing VolumeLeaders windows with process IDs: {existing_browser_pids}")
+                    
+                    # Create a PowerShell command to navigate existing windows
+                    update_cmd = f'''
+                    $browserPids = "{existing_browser_pids}".Split(",");
+                    $windows = @();
+                    foreach ($pid in $browserPids) {{
+                        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
+                        if ($process) {{ $windows += $process }};
+                    }}
+                    
+                    # Update each window with a new URL
+                    $i = 0;
+                    $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                    foreach ($window in $windows) {{
+                        if ($i -lt $urls.Length) {{
+                            Start-Process $urls[$i] -WindowStyle Normal;
+                            Start-Sleep -Milliseconds 500;
+                            $i++;
+                        }}
+                    }}
+                    
+                    # Create additional windows if needed
+                    for (; $i -lt $urls.Length; $i++) {{
+                        Start-Process $urls[$i] -WindowStyle Normal;
+                        Start-Sleep -Milliseconds 500;
+                    }}
+                    
+                    # Return process IDs for all windows
+                    $new_processes = @();
+                    try {{
+                        $new_processes += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    try {{
+                        $new_processes += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | Where-Object {{$_.MainWindowTitle -like "*volumeleaders*"}};
+                    }} catch {{}};
+                    return [string]::Join(",", ($new_processes | ForEach-Object {{ $_.Id }}))
+                    '''
+                    
+                    cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                    
+                    new_pids = result.stdout.strip().split(',')
+                    print(f"Updated windows with process IDs: {new_pids}")
+                    
+                    # Position windows
+                    try:
+                        print("Positioning windows...")
+                        position_windows_powershell([int(pid) for pid in new_pids if pid], browser_path, [url1, url2, url3, url4])
+                    except Exception as e:
+                        print(f"Window positioning failed: {e}")
+                    
+                    return
+            
+            except Exception as e:
+                print(f"Error checking existing windows: {e}")
+                print("Continuing with new windows...")
+            
+            # If no existing windows found or error occurred, create new ones
             print(f"Launching {browser_name} windows...")
             
             # Use --new-window flag to force new windows instead of tabs
