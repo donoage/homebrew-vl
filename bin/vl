@@ -957,26 +957,35 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
         if browser_path:
             # Check for any existing browser windows first
             print("Checking for existing browser windows...")
+            
+            # More aggressive window detection - look for ANY msedge.exe or chrome.exe processes
             try:
-                # This command detects ANY existing browser windows, not just volumeleaders ones
+                # This improved command focuses on windows that are actually browser windows
                 ps_cmd = '''
-                $allBrowserWindows = @();
+                function Find-AllBrowserWindows {
+                    # Get all Chrome windows
+                    $chromeWindows = @()
+                    try {
+                        $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
+                    } catch {}
+                    
+                    # Get all Edge windows
+                    $edgeWindows = @()
+                    try {
+                        $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
+                    } catch {}
+                    
+                    # Combine all browser windows and take up to 4
+                    $browserWindows = @($chromeWindows) + @($edgeWindows) | Select-Object -First 4
+                    return $browserWindows
+                }
                 
-                # Try to find Chrome windows
-                try {
-                    $allBrowserWindows += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
-                } catch {};
+                $browserWindows = Find-AllBrowserWindows
                 
-                # Try to find Edge windows
-                try {
-                    $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
-                } catch {};
-                
-                if ($allBrowserWindows.Count -gt 0) {
-                    $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
-                    return [string]::Join(",", ($allBrowserWindows | ForEach-Object { $_.Id }))
+                if ($browserWindows.Count -gt 0) {
+                    return [string]::Join(",", ($browserWindows | ForEach-Object { $_.Id }))
                 } else {
                     return ""
                 }
@@ -993,77 +1002,79 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                     print(f"Found {len(existing_pids)} existing browser windows with PIDs: {any_browser_pids}")
                     
                     # Update the URLs in these windows
-                    if len(existing_pids) >= 4:
-                        print("Reusing existing browser windows instead of creating new ones...")
-                        
-                        # Navigate these windows to our URLs
-                        update_cmd = f'''
-                        $browserPids = "{any_browser_pids}".Split(",");
-                        $windows = @();
-                        foreach ($pid in $browserPids) {{
-                            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
-                            if ($process) {{ $windows += $process }};
+                    print(f"Reusing existing {browser_name} windows instead of creating new ones...")
+                    
+                    # Navigate these windows to our URLs
+                    update_cmd = f'''
+                    $browserPids = "{any_browser_pids}".Split(",");
+                    $windows = @();
+                    foreach ($pid in $browserPids) {{
+                        $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
+                        if ($process) {{ $windows += $process }};
+                    }}
+                    
+                    # Get the browser process name
+                    $browserName = "";
+                    if ($windows.Count -gt 0) {{
+                        if ($windows[0].Name -eq "chrome") {{
+                            $browserName = "chrome";
+                        }} else {{
+                            $browserName = "msedge";
                         }}
+                    }}
+                    
+                    Write-Host "Navigating $($windows.Count) existing browser windows to new URLs...";
+                    
+                    # Create automation script to navigate existing windows
+                    if ($browserName -ne "") {{
+                        Add-Type -AssemblyName System.Windows.Forms;
+                        # URLs to navigate to
+                        $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                         
-                        # Get the browser process name
-                        $browserName = "";
-                        if ($windows.Count -gt 0) {{
-                            if ($windows[0].Name -eq "chrome") {{
-                                $browserName = "chrome";
-                            }} else {{
-                                $browserName = "msedge";
-                            }}
-                        }}
+                        # Get all browser windows
+                        $allWindows = $windows | Select-Object -First 4;
                         
-                        # Create automation script to navigate existing windows
-                        if ($browserName -ne "") {{
-                            Add-Type -AssemblyName System.Windows.Forms;
-                            # URLs to navigate to
-                            $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
+                        # For each window we found
+                        for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
+                            Write-Host "Navigating window $($i+1) with PID $($allWindows[$i].Id) to new URL";
+                            # Focus the window
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
+                            $allWindows[$i].MainWindowHandle | Out-Null;
+                            [System.Windows.Forms.SendKeys]::SendWait("%");
                             
-                            # Get all browser windows
-                            $allWindows = $windows | Select-Object -First 4;
-                            
-                            # For each window we found
-                            for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
-                                # Focus the window
-                                [System.Windows.Forms.SendKeys]::SendWait("%");
-                                $allWindows[$i].MainWindowHandle | Out-Null;
-                                [System.Windows.Forms.SendKeys]::SendWait("%");
-                                
-                                # Force it to the foreground
-                                $signature = @"
-                                [DllImport("user32.dll")]
-                                public static extern bool SetForegroundWindow(IntPtr hWnd);
+                            # Force it to the foreground
+                            $signature = @"
+                            [DllImport("user32.dll")]
+                            public static extern bool SetForegroundWindow(IntPtr hWnd);
 "@
-                                Add-Type -MemberDefinition $signature -Name SetForegroundWindow -Namespace Win32;
-                                [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
-                                
-                                # Wait a moment
-                                Start-Sleep -Milliseconds 100;
-                                
-                                # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
-                                [System.Windows.Forms.SendKeys]::SendWait("^l");
-                                Start-Sleep -Milliseconds 50;
-                                [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
-                                Start-Sleep -Milliseconds 50;
-                                [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
-                                Start-Sleep -Milliseconds 200;
-                            }}
+                            Add-Type -MemberDefinition $signature -Name SetForegroundWindow -Namespace Win32;
+                            [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
+                            
+                            # Wait a moment
+                            Start-Sleep -Milliseconds 100;
+                            
+                            # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
+                            [System.Windows.Forms.SendKeys]::SendWait("^l");
+                            Start-Sleep -Milliseconds 50;
+                            [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
+                            Start-Sleep -Milliseconds 50;
+                            [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
+                            Start-Sleep -Milliseconds 200;
                         }}
-                        '''
-                        
-                        cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
-                        subprocess.run(cmd, shell=True)
-                        
-                        # Position windows
-                        try:
-                            print("Positioning existing windows...")
-                            position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
-                        except Exception as e:
-                            print(f"Window positioning failed: {e}")
-                        
-                        return
+                    }}
+                    '''
+                    
+                    cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
+                    subprocess.run(cmd, shell=True)
+                    
+                    # Position windows
+                    try:
+                        print("Positioning existing windows...")
+                        position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                    except Exception as e:
+                        print(f"Window positioning failed: {e}")
+                    
+                    return
             except Exception as e:
                 print(f"Error checking for browser windows: {e}")
                 print("Continuing with new windows...")
