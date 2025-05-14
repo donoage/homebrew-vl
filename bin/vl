@@ -656,71 +656,50 @@ def open_urls_windows(url1, url2, url3, url4):
             browser_name = "Edge" if "edge" in chrome_path.lower() or "msedge" in chrome_path.lower() else "Chrome"
             print(f"Using {browser_name} to open VolumeLeaders...")
             
-            # Check for existing VolumeLeaders windows
+            # Check for any existing browser windows first
+            print("Checking for existing browser windows...")
             try:
-                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
+                # This command detects ANY existing browser windows, not just volumeleaders ones
                 ps_cmd = '''
-                $browsers = @();
+                $allBrowserWindows = @();
+                
+                # Try to find Chrome windows
                 try {
-                    # Try to find Chrome windows with volumeleaders in title
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
-                } catch {};
-                try {
-                    # Try to find Edge windows with volumeleaders in title
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
+                    $allBrowserWindows += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                 } catch {};
                 
-                # If we didn't find any browser windows with the above criteria, 
-                # look for any Chrome or Edge windows
-                if ($browsers.Count -eq 0) {
-                    try {
-                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
-                            Select-Object -First 4;
-                    } catch {};
-                    try {
-                        if ($browsers.Count -eq 0) {
-                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
-                                Select-Object -First 4;
-                        }
-                    } catch {};
-                }
+                # Try to find Edge windows
+                try {
+                    $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                } catch {};
                 
-                # Only return up to 4 browser windows to avoid excess
-                $browsers = $browsers | Select-Object -First 4;
-                
-                if ($browsers.Count -gt 0) { 
-                    # Return process IDs as CSV
-                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
-                } else { 
-                    return "" 
+                if ($allBrowserWindows.Count -gt 0) {
+                    $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
+                    return [string]::Join(",", ($allBrowserWindows | ForEach-Object { $_.Id }))
+                } else {
+                    return ""
                 }
                 '''
                 
                 # Run PowerShell command
                 result = subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True, text=True)
                 
-                existing_browser_pids = result.stdout.strip()
+                any_browser_pids = result.stdout.strip()
                 
-                if existing_browser_pids:
-                    print(f"Found existing browser windows with process IDs: {existing_browser_pids}")
+                # If we found ANY browser windows, use those
+                if any_browser_pids:
+                    existing_pids = any_browser_pids.split(',')
+                    print(f"Found {len(existing_pids)} existing browser windows with PIDs: {any_browser_pids}")
                     
-                    # Split the existing PIDs
-                    existing_pids = existing_browser_pids.split(',')
-                    
-                    # If we found at least 4 existing windows, we don't need to create new ones at all
+                    # Update the URLs in these windows
                     if len(existing_pids) >= 4:
-                        print("Reusing existing browser windows - not creating new ones")
-                        print("Updating URLs in existing windows...")
+                        print("Reusing existing browser windows instead of creating new ones...")
                         
-                        # Use the navigation PowerShell script to update the URLs
+                        # Navigate these windows to our URLs
                         update_cmd = f'''
-                        $browserPids = "{existing_browser_pids}".Split(",");
+                        $browserPids = "{any_browser_pids}".Split(",");
                         $windows = @();
                         foreach ($pid in $browserPids) {{
                             $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
@@ -744,10 +723,7 @@ def open_urls_windows(url1, url2, url3, url4):
                             $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                             
                             # Get all browser windows
-                            $allWindows = Get-Process -Name $browserName | Where-Object {{ 
-                                $_.MainWindowTitle -like "*volumeleaders*" -or
-                                ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
-                            }} | Select-Object -First 4;
+                            $allWindows = $windows | Select-Object -First 4;
                             
                             # For each window we found
                             for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
@@ -895,72 +871,50 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                     break
         
         if browser_path:
-            # Check for existing VolumeLeaders windows
+            # Check for any existing browser windows first
+            print("Checking for existing browser windows...")
             try:
-                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
+                # This command detects ANY existing browser windows, not just volumeleaders ones
                 ps_cmd = '''
-                $browsers = @();
+                $allBrowserWindows = @();
+                
+                # Try to find Chrome windows
                 try {
-                    # Try to find Chrome windows with volumeleaders in title
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
-                } catch {};
-                try {
-                    # Try to find Edge windows with volumeleaders in title
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
+                    $allBrowserWindows += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                 } catch {};
                 
-                # If we didn't find any browser windows with the above criteria, 
-                # look for any Chrome or Edge windows
-                if ($browsers.Count -eq 0) {
-                    try {
-                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
-                            Select-Object -First 4;
-                    } catch {};
-                    try {
-                        if ($browsers.Count -eq 0) {
-                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
-                                Select-Object -First 4;
-                        }
-                    } catch {};
-                }
+                # Try to find Edge windows
+                try {
+                    $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                } catch {};
                 
-                # Only return up to 4 browser windows to avoid excess
-                $browsers = $browsers | Select-Object -First 4;
-                
-                if ($browsers.Count -gt 0) { 
-                    # Return process IDs as CSV
-                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
-                } else { 
-                    return "" 
+                if ($allBrowserWindows.Count -gt 0) {
+                    $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
+                    return [string]::Join(",", ($allBrowserWindows | ForEach-Object { $_.Id }))
+                } else {
+                    return ""
                 }
                 '''
                 
-                # Run the PowerShell command from WSL
                 cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 
-                existing_browser_pids = result.stdout.strip()
+                any_browser_pids = result.stdout.strip()
                 
-                if existing_browser_pids:
-                    print(f"Found existing browser windows with process IDs: {existing_browser_pids}")
+                # If we found ANY browser windows, use those
+                if any_browser_pids:
+                    existing_pids = any_browser_pids.split(',')
+                    print(f"Found {len(existing_pids)} existing browser windows with PIDs: {any_browser_pids}")
                     
-                    # Split the existing PIDs
-                    existing_pids = existing_browser_pids.split(',')
-                    
-                    # If we found at least 4 existing windows, we don't need to create new ones at all
+                    # Update the URLs in these windows
                     if len(existing_pids) >= 4:
-                        print("Reusing existing browser windows - not creating new ones")
-                        print("Updating URLs in existing windows...")
+                        print("Reusing existing browser windows instead of creating new ones...")
                         
-                        # Use the navigation PowerShell script to update the URLs
+                        # Navigate these windows to our URLs
                         update_cmd = f'''
-                        $browserPids = "{existing_browser_pids}".Split(",");
+                        $browserPids = "{any_browser_pids}".Split(",");
                         $windows = @();
                         foreach ($pid in $browserPids) {{
                             $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
@@ -984,10 +938,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                             $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                             
                             # Get all browser windows
-                            $allWindows = Get-Process -Name $browserName | Where-Object {{ 
-                                $_.MainWindowTitle -like "*volumeleaders*" -or
-                                ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
-                            }} | Select-Object -First 4;
+                            $allWindows = $windows | Select-Object -First 4;
                             
                             # For each window we found
                             for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
@@ -1019,7 +970,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                         '''
                         
                         cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                        subprocess.run(cmd, shell=True)
                         
                         # Position windows
                         try:
@@ -1029,12 +980,11 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                             print(f"Window positioning failed: {e}")
                         
                         return
-            
             except Exception as e:
-                print(f"Error checking existing windows: {e}")
+                print(f"Error checking for browser windows: {e}")
                 print("Continuing with new windows...")
             
-            # Use Windows browser directly - open all windows first without waiting
+            # If no existing windows found or error occurred, create new ones
             print(f"Launching {browser_name} windows...")
             
             # Use --new-window flag to force new windows instead of tabs
@@ -1051,7 +1001,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             process_ids = [p.pid for p in processes]
             print(f"Browser process IDs: {process_ids}")
             
-            # Give them a moment to start
+            # Give them a moment to start up
             print("Waiting for browser windows to initialize...")
             time.sleep(3)  # Reduced delay
             
@@ -1115,10 +1065,10 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
 def open_urls_wsl(url1, url2, url3, url4):
     """Open URLs when running in WSL environment."""
     try:
-        # Try to find Chrome first
+        # Try to find browsers in Windows
         print("Looking for browsers in Windows...")
         
-        # Try to find Chrome in common Windows locations
+        # Try to find Chrome first in common Windows locations
         chrome_paths = [
             '/mnt/c/Program Files/Google/Chrome/Application/chrome.exe',
             '/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe',
@@ -1162,51 +1112,31 @@ def open_urls_wsl(url1, url2, url3, url4):
         
         # If a browser was found, check for existing windows
         if browser_path:
-            print(f"Checking for existing {browser_name} windows...")
+            print(f"Checking for existing browser windows...")
             
-            # Try to detect existing VolumeLeaders windows using PowerShell
+            # Try to detect browser windows using PowerShell
             try:
-                # Create a PowerShell command to look for browser windows with VolumeLeaders in the title
+                # This command detects ANY existing browser windows, not just volumeleaders ones
                 ps_cmd = '''
-                $browsers = @();
+                $allBrowserWindows = @();
+                
+                # Try to find Chrome windows
                 try {
-                    # Try to find Chrome windows with volumeleaders in title
-                    $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
-                } catch {};
-                try {
-                    # Try to find Edge windows with volumeleaders in title
-                    $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -like "*volumeleaders*" -or 
-                                     ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)};
+                    $allBrowserWindows += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                 } catch {};
                 
-                # If we didn't find any browser windows with the above criteria, 
-                # look for any Chrome or Edge windows
-                if ($browsers.Count -eq 0) {
-                    try {
-                        $browsers += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} | 
-                            Select-Object -First 4;
-                    } catch {};
-                    try {
-                        if ($browsers.Count -eq 0) {
-                            $browsers += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                                Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero} |
-                                Select-Object -First 4;
-                        }
-                    } catch {};
-                }
+                # Try to find Edge windows
+                try {
+                    $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                } catch {};
                 
-                # Only return up to 4 browser windows to avoid excess
-                $browsers = $browsers | Select-Object -First 4;
-                
-                if ($browsers.Count -gt 0) { 
-                    # Return process IDs as CSV
-                    return [string]::Join(",", ($browsers | ForEach-Object { $_.Id }))
-                } else { 
-                    return "" 
+                if ($allBrowserWindows.Count -gt 0) {
+                    $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
+                    return [string]::Join(",", ($allBrowserWindows | ForEach-Object { $_.Id }))
+                } else {
+                    return ""
                 }
                 '''
                 
@@ -1214,22 +1144,20 @@ def open_urls_wsl(url1, url2, url3, url4):
                 cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 
-                existing_browser_pids = result.stdout.strip()
+                any_browser_pids = result.stdout.strip()
                 
-                if existing_browser_pids:
-                    print(f"Found existing browser windows with process IDs: {existing_browser_pids}")
+                # If we found ANY browser windows, use those
+                if any_browser_pids:
+                    existing_pids = any_browser_pids.split(',')
+                    print(f"Found {len(existing_pids)} existing browser windows with PIDs: {any_browser_pids}")
                     
-                    # Split the existing PIDs
-                    existing_pids = existing_browser_pids.split(',')
-                    
-                    # If we found at least 4 existing windows, we don't need to create new ones at all
+                    # Update the URLs in these windows
                     if len(existing_pids) >= 4:
-                        print("Reusing existing browser windows - not creating new ones")
-                        print("Updating URLs in existing windows...")
+                        print("Reusing existing browser windows instead of creating new ones...")
                         
-                        # Use the navigation PowerShell script to update the URLs
+                        # Navigate these windows to our URLs
                         update_cmd = f'''
-                        $browserPids = "{existing_browser_pids}".Split(",");
+                        $browserPids = "{any_browser_pids}".Split(",");
                         $windows = @();
                         foreach ($pid in $browserPids) {{
                             $process = Get-Process -Id $pid -ErrorAction SilentlyContinue;
@@ -1253,10 +1181,7 @@ def open_urls_wsl(url1, url2, url3, url4):
                             $urls = @("{url1}", "{url2}", "{url3}", "{url4}");
                             
                             # Get all browser windows
-                            $allWindows = Get-Process -Name $browserName | Where-Object {{ 
-                                $_.MainWindowTitle -like "*volumeleaders*" -or
-                                ($_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero)
-                            }} | Select-Object -First 4;
+                            $allWindows = $windows | Select-Object -First 4;
                             
                             # For each window we found
                             for ($i = 0; $i -lt [Math]::Min($allWindows.Count, $urls.Count); $i++) {{
@@ -1288,7 +1213,7 @@ def open_urls_wsl(url1, url2, url3, url4):
                         '''
                         
                         cmd = f"cd /mnt/c && powershell.exe -Command \"{update_cmd}\""
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                        subprocess.run(cmd, shell=True)
                         
                         # Position windows
                         try:
@@ -1298,9 +1223,8 @@ def open_urls_wsl(url1, url2, url3, url4):
                             print(f"Window positioning failed: {e}")
                         
                         return
-            
             except Exception as e:
-                print(f"Error checking existing windows: {e}")
+                print(f"Error checking for browser windows: {e}")
                 print("Continuing with new windows...")
             
             # If no existing windows found or error occurred, create new ones
