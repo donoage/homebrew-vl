@@ -45,12 +45,27 @@ def main():
     # Detect operating system
     system = platform.system()
     
+    # Check if running in WSL
+    is_wsl = False
+    if system == "Linux":
+        try:
+            with open('/proc/version', 'r') as f:
+                if 'microsoft' in f.read().lower():
+                    is_wsl = True
+                    print("Detected Windows Subsystem for Linux (WSL)")
+        except:
+            pass
+    
     if system == "Darwin":  # macOS
         print("Detected macOS - Using AppleScript for window positioning")
         open_urls_macos(url1, url2, url3, url4)
-    elif system == "Windows":  # Windows
-        print("Detected Windows - Opening URLs in default browser")
-        open_urls_windows(url1, url2, url3, url4)
+    elif system == "Windows" or is_wsl:  # Windows or WSL
+        if is_wsl:
+            print("Using WSL-specific browser opening method")
+            open_urls_wsl(url1, url2, url3, url4)
+        else:
+            print("Detected Windows - Opening URLs in default browser")
+            open_urls_windows(url1, url2, url3, url4)
     else:  # Linux or other
         print(f"Detected {system} - Opening URLs in default browser")
         open_urls_default(url1, url2, url3, url4)
@@ -249,6 +264,49 @@ def open_urls_macos(url1, url2, url3, url4):
         
         subprocess.run(["osascript", "-e", applescript])
         print(f"Successfully created chart windows for {sys.argv[1].upper()}")
+
+def open_urls_wsl(url1, url2, url3, url4):
+    """Open URLs when running in WSL environment."""
+    try:
+        # Try to use powershell.exe to open URLs in the Windows host's browser
+        print("Opening URLs using Windows host browser...")
+        
+        # Escape quotes in URLs for PowerShell
+        ps_url1 = url1.replace('"', '\\"')
+        ps_url2 = url2.replace('"', '\\"')
+        ps_url3 = url3.replace('"', '\\"')
+        ps_url4 = url4.replace('"', '\\"')
+        
+        # Open each URL using powershell.exe Start-Process
+        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url1}"'])
+        time.sleep(1)
+        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url2}"'])
+        time.sleep(1)
+        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url3}"'])
+        time.sleep(1)
+        subprocess.run(['powershell.exe', '-Command', f'Start-Process "{ps_url4}"'])
+        
+    except Exception as e:
+        print(f"WSL browser opening method failed: {e}")
+        print("Trying alternative method with cmd.exe...")
+        
+        try:
+            # Alternative approach using cmd.exe and start command
+            subprocess.run(['cmd.exe', '/c', f'start {url1}'])
+            time.sleep(1)
+            subprocess.run(['cmd.exe', '/c', f'start {url2}'])
+            time.sleep(1)
+            subprocess.run(['cmd.exe', '/c', f'start {url3}'])
+            time.sleep(1)
+            subprocess.run(['cmd.exe', '/c', f'start {url4}'])
+            
+        except Exception as e2:
+            print(f"Alternative WSL method failed: {e2}")
+            print("Please manually open the following URLs:")
+            print(f"URL 1: {url1}")
+            print(f"URL 2: {url2}")
+            print(f"URL 3: {url3}")
+            print(f"URL 4: {url4}")
 
 def open_urls_windows(url1, url2, url3, url4):
     """Open URLs on Windows."""
