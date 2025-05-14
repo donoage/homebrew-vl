@@ -353,7 +353,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
 
         # First wait a bit for browser windows to initialize
         Write-Host "Waiting for browser windows to initialize..."
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 2
         
         # Try detecting windows by their title containing 'volumeleaders' first
         # This is more reliable than process IDs
@@ -415,9 +415,9 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             # Prioritize windows with "volumeleaders" in the title
             $volumeLeadersWindows = $windows | Where-Object { $_.Title -like "*volumeleaders*" }
             
-            # If we found volumeleaders windows, use those, otherwise use all browser windows we found
+            # If we found volumeleaders windows, use at most 4 of them
             if ($volumeLeadersWindows.Count -gt 0) {
-                return $volumeLeadersWindows
+                return $volumeLeadersWindows | Select-Object -First 4
             }
             
             # If we don't have enough windows, just return all we found (up to 4)
@@ -426,6 +426,33 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         
         # Find all VolumeLeaders windows
         $browserWindows = Find-VolumeLeadersWindows
+        
+        # Close excess browser windows if we found more than 4
+        if ($browserWindows.Count -gt 4) {
+            Write-Host "Found $($browserWindows.Count) browser windows, closing excess windows..."
+            
+            # Sort windows to close the newest ones first (assuming they're the extras)
+            $windowsToClose = $browserWindows | Select-Object -Skip 4
+            
+            foreach ($window in $windowsToClose) {
+                try {
+                    # Try to close the window by sending Alt+F4
+                    [Win32]::SetForegroundWindow($window.Handle) | Out-Null
+                    Start-Sleep -Milliseconds 100
+                    
+                    # Send Alt+F4 to close the window
+                    Add-Type -AssemblyName System.Windows.Forms
+                    [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
+                    Start-Sleep -Milliseconds 200
+                } catch {
+                    Write-Host "Failed to close extra window: $_"
+                }
+            }
+            
+            # Update our list to only use the first 4 windows
+            $browserWindows = $browserWindows | Select-Object -First 4
+            Start-Sleep -Milliseconds 500
+        }
         
         # If no windows found with title, then fallback to process IDs
         if ($browserWindows.Count -eq 0) {
@@ -727,15 +754,15 @@ def open_urls_windows(url1, url2, url3, url4):
                             [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
                             
                             # Wait a moment
-                            Start-Sleep -Milliseconds 300;
+                            Start-Sleep -Milliseconds 100;
                             
                             # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
                             [System.Windows.Forms.SendKeys]::SendWait("^l");
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
-                            Start-Sleep -Milliseconds 500;
+                            Start-Sleep -Milliseconds 200;
                         }}
                         
                         # Create additional windows if needed
@@ -783,20 +810,20 @@ def open_urls_windows(url1, url2, url3, url4):
             print(f"Launching new {browser_name} windows...")
             processes = []
             processes.append(subprocess.Popen([chrome_path, "--new-window", url1]))
-            time.sleep(2)  # Give first window more time to fully initialize
+            time.sleep(1)  # Reduced delay
             processes.append(subprocess.Popen([chrome_path, "--new-window", url2]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([chrome_path, "--new-window", url3]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([chrome_path, "--new-window", url4]))
             
             # Get process IDs for positioning
             process_ids = [p.pid for p in processes]
             print(f"Browser process IDs: {process_ids}")
             
-            # Give them longer to start up and load the pages
-            print("Waiting for browser windows to fully initialize...")
-            time.sleep(5)
+            # Give them a moment to start up
+            print("Waiting for browser windows to initialize...")
+            time.sleep(3)  # Reduced delay
             
             # Try to position windows
             try:
@@ -979,15 +1006,15 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                             [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
                             
                             # Wait a moment
-                            Start-Sleep -Milliseconds 300;
+                            Start-Sleep -Milliseconds 100;
                             
                             # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
                             [System.Windows.Forms.SendKeys]::SendWait("^l");
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
-                            Start-Sleep -Milliseconds 500;
+                            Start-Sleep -Milliseconds 200;
                         }}
                         
                         # Create additional windows if needed
@@ -1037,11 +1064,11 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             # Use --new-window flag to force new windows instead of tabs
             processes = []
             processes.append(subprocess.Popen([browser_path, "--new-window", url1]))
-            time.sleep(2)  # Give first window more time to fully initialize
+            time.sleep(1)  # Reduced delay
             processes.append(subprocess.Popen([browser_path, "--new-window", url2]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([browser_path, "--new-window", url3]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([browser_path, "--new-window", url4]))
             
             # Get process IDs for positioning
@@ -1049,7 +1076,8 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             print(f"Browser process IDs: {process_ids}")
             
             # Give them a moment to start
-            time.sleep(3)
+            print("Waiting for browser windows to initialize...")
+            time.sleep(3)  # Reduced delay
             
             # Need to import shutil for WSL
             import shutil
@@ -1259,15 +1287,15 @@ def open_urls_wsl(url1, url2, url3, url4):
                             [Win32.SetForegroundWindow]::SetForegroundWindow($allWindows[$i].MainWindowHandle) | Out-Null;
                             
                             # Wait a moment
-                            Start-Sleep -Milliseconds 300;
+                            Start-Sleep -Milliseconds 100;
                             
                             # Navigate to URL by using Ctrl+L to focus address bar, then typing URL and pressing Enter
                             [System.Windows.Forms.SendKeys]::SendWait("^l");
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait($urls[$i]);
-                            Start-Sleep -Milliseconds 100;
+                            Start-Sleep -Milliseconds 50;
                             [System.Windows.Forms.SendKeys]::SendWait("{{ENTER}}");
-                            Start-Sleep -Milliseconds 500;
+                            Start-Sleep -Milliseconds 200;
                         }}
                         
                         # Create additional windows if needed
@@ -1317,20 +1345,20 @@ def open_urls_wsl(url1, url2, url3, url4):
             # Use --new-window flag to force new windows instead of tabs
             processes = []
             processes.append(subprocess.Popen([browser_path, "--new-window", url1]))
-            time.sleep(2)  # Give first window more time to fully initialize
+            time.sleep(1)  # Reduced delay
             processes.append(subprocess.Popen([browser_path, "--new-window", url2]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([browser_path, "--new-window", url3]))
-            time.sleep(2)
+            time.sleep(1)
             processes.append(subprocess.Popen([browser_path, "--new-window", url4]))
             
             # Get process IDs for positioning
             process_ids = [p.pid for p in processes]
             print(f"Browser process IDs: {process_ids}")
             
-            # Give them longer to start up and load the pages
-            print("Waiting for browser windows to fully initialize...")
-            time.sleep(5)
+            # Give them a moment to start up
+            print("Waiting for browser windows to initialize...")
+            time.sleep(3)  # Reduced delay
             
             # Need to import shutil for WSL
             import shutil
