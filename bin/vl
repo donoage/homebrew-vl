@@ -140,114 +140,198 @@ def open_urls_macos(url1, url2, url3, url4):
     
     # Make sure Chrome is running
     subprocess.run(["open", "-a", "Google Chrome"])
-    time.sleep(1)
+    time.sleep(0.5)
     
-    # Check if VolumeLeaders windows already exist
+    # Enhanced method to check for browser windows
+    # This will find ALL Chrome windows, not just ones with volumeleaders in the title
     applescript = '''
     try
         tell application "Google Chrome"
+            set windowCount to count of windows
+            
+            # First try to find any VolumeLeaders windows
             set vlWindows to {}
             repeat with w in windows
                 try
-                    set winURL to URL of active tab of w
-                    if winURL contains "volumeleaders.com/Chart" then
-                        set end of vlWindows to w
-                    end if
+                    set tabCount to count of tabs of w
+                    repeat with t from 1 to tabCount
+                        set tabURL to URL of tab t of w
+                        if tabURL contains "volumeleaders.com/Chart" then
+                            set end of vlWindows to w
+                            exit repeat
+                        end if
+                    end repeat
                 on error
                     # Skip if we can't get the URL
                 end try
             end repeat
-            return (count of vlWindows)
+            
+            # If we found VolumeLeaders windows, return those count
+            if (count of vlWindows) > 0 then
+                return "volumeleaders:" & (count of vlWindows)
+            end if
+            
+            # If not, just return the count of all windows with actual content
+            set contentWindows to {}
+            repeat with w in windows
+                # Only consider windows that aren't tiny
+                set winBounds to bounds of w
+                set winWidth to item 3 of winBounds - item 1 of winBounds
+                set winHeight to item 4 of winBounds - item 2 of winBounds
+                
+                if winWidth > 200 and winHeight > 200 then
+                    set end of contentWindows to w
+                end if
+            end repeat
+            
+            return "any:" & (count of contentWindows)
         end tell
-    on error
-        return 0
+    on error errMsg
+        return "error:" & errMsg
     end try
     '''
     
     result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
-    window_count = int(result.stdout.strip() or "0")
+    window_info = result.stdout.strip()
+    
+    window_count = 0
+    window_type = "none"
+    
+    if window_info.startswith("volumeleaders:"):
+        window_count = int(window_info.split(":")[1])
+        window_type = "volumeleaders"
+    elif window_info.startswith("any:"):
+        window_count = int(window_info.split(":")[1])
+        window_type = "any"
+    elif window_info.startswith("error:"):
+        print(f"Error checking for windows: {window_info}")
+    
+    print(f"Found {window_count} browser windows of type '{window_type}'")
     
     if window_count >= 1:
-        print(f"Found {window_count} existing VolumeLeaders windows. Updating them...")
+        print(f"Reusing {window_count} existing browser windows...")
         
         # Update existing windows
         applescript = f'''
         try
             tell application "Google Chrome"
-                # Find all VolumeLeaders windows
+                # Get the actual windows we'll be using
+                set targetWindows to {{}}
+                
+                # First try to look for volumeleaders windows
                 set vlWindows to {{}}
                 repeat with w in windows
                     try
-                        set winURL to URL of active tab of w
-                        if winURL contains "volumeleaders.com/Chart" then
-                            set end of vlWindows to w
-                        end if
+                        set tabCount to count of tabs of w
+                        repeat with t from 1 to tabCount
+                            set tabURL to URL of tab t of w
+                            if tabURL contains "volumeleaders.com/Chart" then
+                                set end of vlWindows to w
+                                exit repeat
+                            end if
+                        end repeat
                     on error
                         # Skip if we can't get the URL
                     end try
                 end repeat
                 
-                # Update VolumeLeaders windows, up to 4
-                set windowCount to count of vlWindows
+                # If we found VolumeLeaders windows, use those first
+                if (count of vlWindows) > 0 then
+                    set targetWindows to vlWindows
+                else
+                    # Otherwise, just use any content windows
+                    repeat with w in windows
+                        # Only consider windows that aren't tiny
+                        set winBounds to bounds of w
+                        set winWidth to item 3 of winBounds - item 1 of winBounds
+                        set winHeight to item 4 of winBounds - item 2 of winBounds
+                        
+                        if winWidth > 200 and winHeight > 200 then
+                            set end of targetWindows to w
+                        end if
+                    end repeat
+                end if
                 
-                # If we have at least 1 window, update it and position as window 1
-                if windowCount >= 1 then
-                    set w to item 1 of vlWindows
+                # Close any excess windows beyond 4
+                if (count of targetWindows) > 4 then
+                    log "Found " & (count of targetWindows) & " windows, closing excess..."
+                    repeat with i from 5 to (count of targetWindows)
+                        close window i
+                    end repeat
+                    # Now we only have 4 windows
+                    set targetWindows to items 1 through 4 of targetWindows
+                end if
+                
+                # Log how many windows we're working with
+                log "Using " & (count of targetWindows) & " windows"
+                
+                # Update windows and position them
+                if (count of targetWindows) >= 1 then
+                    # Window 1: Top-Left
+                    set w to item 1 of targetWindows
                     set bounds of w to {{0, 23, {half_width}, {half_height}}}
+                    set active tab index of w to 1
                     tell active tab of w to set URL to "{url1}"
                 end if
                 
-                # If we have at least 2 windows, update the 2nd one
-                if windowCount >= 2 then
-                    set w to item 2 of vlWindows
+                if (count of targetWindows) >= 2 then
+                    # Window 2: Top-Right
+                    set w to item 2 of targetWindows
                     set bounds of w to {{{half_width}, 23, {screen_width}, {half_height}}}
+                    set active tab index of w to 1
                     tell active tab of w to set URL to "{url2}"
                 end if
                 
-                # If we have at least 3 windows, update the 3rd one
-                if windowCount >= 3 then
-                    set w to item 3 of vlWindows
+                if (count of targetWindows) >= 3 then
+                    # Window 3: Bottom-Left
+                    set w to item 3 of targetWindows
                     set bounds of w to {{0, {half_height}, {half_width}, {screen_height}}}
+                    set active tab index of w to 1
                     tell active tab of w to set URL to "{url3}"
                 end if
                 
-                # If we have at least 4 windows, update the 4th one
-                if windowCount >= 4 then
-                    set w to item 4 of vlWindows
+                if (count of targetWindows) >= 4 then
+                    # Window 4: Bottom-Right
+                    set w to item 4 of targetWindows
                     set bounds of w to {{{half_width}, {half_height}, {screen_width}, {screen_height}}}
+                    set active tab index of w to 1
                     tell active tab of w to set URL to "{url4}"
                 end if
                 
                 # Create any additional windows we need (if we found fewer than 4)
-                if windowCount < 4 then
+                if (count of targetWindows) < 4 then
                     # Create window 2 if needed
-                    if windowCount < 2 then
+                    if (count of targetWindows) < 2 then
                         make new window with properties {{bounds:{{{half_width}, 23, {screen_width}, {half_height}}}}}
                         tell active tab of front window to set URL to "{url2}"
-                        delay 0.5
+                        delay 0.3
                     end if
                     
                     # Create window 3 if needed
-                    if windowCount < 3 then
+                    if (count of targetWindows) < 3 then
                         make new window with properties {{bounds:{{0, {half_height}, {half_width}, {screen_height}}}}}
                         tell active tab of front window to set URL to "{url3}"
-                        delay 0.5
+                        delay 0.3
                     end if
                     
                     # Create window 4 if needed
-                    if windowCount < 4 then
+                    if (count of targetWindows) < 4 then
                         make new window with properties {{bounds:{{{half_width}, {half_height}, {screen_width}, {screen_height}}}}}
                         tell active tab of front window to set URL to "{url4}"
                     end if
                 end if
             end tell
+            return "success"
         on error errMsg
             return "ERROR: " & errMsg
         end try
         '''
         
-        subprocess.run(["osascript", "-e", applescript])
-        print(f"Updated chart windows for {sys.argv[1].upper()}")
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+        if result.stdout.strip().startswith("ERROR:"):
+            print(f"Error updating windows: {result.stdout.strip()}")
+        else:
+            print(f"Successfully updated chart windows for {sys.argv[1].upper()}")
     else:
         # No existing windows found, create new ones
         print(f"Creating new chart windows for {sys.argv[1].upper()}...")
@@ -257,17 +341,17 @@ def open_urls_macos(url1, url2, url3, url4):
             # Window 1: Top-Left - 3 month chart
             make new window with properties {{bounds:{{0, 23, {half_width}, {half_height}}}}}
             tell active tab of front window to set URL to "{url1}"
-            delay 0.5
+            delay 0.3
             
             # Window 2: Top-Right - 1 month chart with dark pools and sweeps
             make new window with properties {{bounds:{{{half_width}, 23, {screen_width}, {half_height}}}}}
             tell active tab of front window to set URL to "{url2}"
-            delay 0.5
+            delay 0.3
             
             # Window 3: Bottom-Left - 1 month chart
             make new window with properties {{bounds:{{0, {half_height}, {half_width}, {screen_height}}}}}
             tell active tab of front window to set URL to "{url3}"
-            delay 0.5
+            delay 0.3
             
             # Window 4: Bottom-Right - 1 week chart with dark pools and sweeps
             make new window with properties {{bounds:{{{half_width}, {half_height}, {screen_width}, {screen_height}}}}}
