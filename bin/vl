@@ -12,7 +12,7 @@ import shutil
 import json
 import tempfile
 
-# VL Script Version 3.0.13 - Prioritize Chrome over Edge on Windows/WSL
+# VL Script Version 3.0.14 - Fix Windows browser URL updating and add global command line support
 
 def print_usage():
     """Print usage instructions."""
