@@ -581,7 +581,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             $volumeLeadersWindows = $windows | Where-Object { $_.Title -like "*volumeleaders*" }
             
             # If we found volumeleaders windows, use at most 4 of them
-            if ($volumeLeadersWindows.Count -gt 0) {
+            if ($volumeLeadersWindows -and $volumeLeadersWindows.Count -gt 0) {
                 return $volumeLeadersWindows | Select-Object -First 4
             }
             
@@ -593,7 +593,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         $browserWindows = Find-VolumeLeadersWindows
         
         # Close excess browser windows if we found more than 4
-        if ($browserWindows.Count -gt 4) {
+        if ($browserWindows -and $browserWindows.Count -gt 4) {
             Write-Host "Found $($browserWindows.Count) browser windows, closing excess windows..."
             
             # Sort windows to close the newest ones first (assuming they're the extras)
@@ -620,7 +620,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         }
         
         # If no windows found with title, then fallback to process IDs
-        if ($browserWindows.Count -eq 0) {
+        if (-not $browserWindows -or $browserWindows.Count -eq 0) {
             Write-Host "No windows found by title, falling back to process IDs..."
             
             # Array to store window handles by process IDs
@@ -679,7 +679,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             $browserWindows = Find-WindowsByProcessId
             
             # Return error if we didn't find any windows by process ID
-            if ($browserWindows.Count -eq 0) {
+            if (-not $browserWindows -or $browserWindows.Count -eq 0) {
                 Write-Host "Found 0 browser windows to position"
                 return "no_windows_found"
             }
@@ -787,12 +787,13 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                     $screen = [System.Windows.Forms.Screen]::PrimaryScreen;
                     $w = $screen.Bounds.Width/2; $h = $screen.Bounds.Height/2;
                     $windows = (Get-Process | Where-Object {$_.MainWindowTitle -ne "" -and $_.Id -in @args[0].Split(",")}).MainWindow;
-                    for ($i=0; $i -lt $windows.Count -and $i -lt 4; $i++) {
-                        $pos = @(@(0,0,$w,$h), @($w,0,$screen.Bounds.Width,$h), @(0,$h,$w,$screen.Bounds.Height), @($w,$h,$screen.Bounds.Width,$screen.Bounds.Height))[$i];
-                        $windows[$i].Left = $pos[0]; $windows[$i].Top = $pos[1];
-                        $windows[$i].Width = $pos[2]-$pos[0]; $windows[$i].Height = $pos[3]-$pos[1];
-                    }
-                    if ($windows.Count -eq 0) {
+                    if ($windows -and $windows.Count -gt 0) {
+                        for ($i=0; $i -lt $windows.Count -and $i -lt 4; $i++) {
+                            $pos = @(@(0,0,$w,$h), @($w,0,$screen.Bounds.Width,$h), @(0,$h,$w,$screen.Bounds.Height), @($w,$h,$screen.Bounds.Width,$screen.Bounds.Height))[$i];
+                            $windows[$i].Left = $pos[0]; $windows[$i].Top = $pos[1];
+                            $windows[$i].Width = $pos[2]-$pos[0]; $windows[$i].Height = $pos[3]-$pos[1];
+                        }
+                    } else {
                         Write-Host "No windows found with process IDs: @args[0]";
                         return "no_windows_found";
                     }
@@ -906,7 +907,7 @@ def open_urls_windows(url1, url2, url3, url4):
                 Start-Sleep -Seconds 1
                 
                 # Return the browser name we found
-                if ($windows.Count -gt 0) {{
+                if ($windows -and $windows.Count -gt 0) {{
                     if ($windows[0].Name -eq "chrome") {{
                         return "chrome"
                     }} else {{
@@ -938,7 +939,7 @@ def open_urls_windows(url1, url2, url3, url4):
                         Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                     
                     # If we have Chrome windows, prioritize those
-                    if ($chromeWindows.Count -ge 1) {
+                    if ($chromeWindows -and $chromeWindows.Count -ge 1) {
                         $allBrowserWindows = $chromeWindows;
                     }
                 } catch {};
@@ -948,11 +949,13 @@ def open_urls_windows(url1, url2, url3, url4):
                     try {
                         $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
                             Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                        $allBrowserWindows += $edgeWindows;
+                        if ($edgeWindows) {
+                            $allBrowserWindows += $edgeWindows;
+                        }
                     } catch {};
                 }
                 
-                if ($allBrowserWindows.Count -gt 0) {
+                if ($allBrowserWindows -and $allBrowserWindows.Count -gt 0) {
                     # MODIFIED: Close existing windows instead of trying to reuse them
                     foreach ($window in $allBrowserWindows) {
                         try {
@@ -1100,14 +1103,18 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             try {
                 $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
                     Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                $allBrowserWindows += $chromeWindows
+                if ($chromeWindows) {
+                    $allBrowserWindows += $chromeWindows
+                }
             } catch {}
             
             # Get all Edge windows
             try {
                 $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
                     Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                $allBrowserWindows += $edgeWindows
+                if ($edgeWindows) {
+                    $allBrowserWindows += $edgeWindows
+                }
             } catch {}
             
             # Close all found windows
@@ -1274,7 +1281,7 @@ def open_urls_wsl(url1, url2, url3, url4):
                         Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                     
                     # If we have Chrome windows, prioritize those
-                    if ($chromeWindows.Count -ge 1) {
+                    if ($chromeWindows -and $chromeWindows.Count -ge 1) {
                         $allBrowserWindows = $chromeWindows;
                     }
                 } catch {};
@@ -1284,11 +1291,13 @@ def open_urls_wsl(url1, url2, url3, url4):
                     try {
                         $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
                             Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                        $allBrowserWindows += $edgeWindows;
+                        if ($edgeWindows) {
+                            $allBrowserWindows += $edgeWindows;
+                        }
                     } catch {};
                 }
                 
-                if ($allBrowserWindows.Count -gt 0) {
+                if ($allBrowserWindows -and $allBrowserWindows.Count -gt 0) {
                     # MODIFIED: Close existing windows instead of trying to reuse them
                     foreach ($window in $allBrowserWindows) {
                         try {
