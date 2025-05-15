@@ -12,6 +12,8 @@ import shutil
 import json
 import tempfile
 
+# VL Script Version 3.0.7 - Fixed window reuse with stored PIDs in Windows/WSL
+
 def print_usage():
     """Print usage instructions."""
     print("Usage: vl TICKER")
@@ -44,6 +46,20 @@ def store_window_ids(window_ids, browser_name, system_type="windows"):
         return True
     except Exception as e:
         print(f"Error storing window IDs: {e}")
+        return False
+
+def clear_stored_window_ids(system_type="windows"):
+    """Clear stored window IDs when they're no longer valid."""
+    try:
+        temp_dir = os.path.join(tempfile.gettempdir(), "vl_app")
+        temp_file = os.path.join(temp_dir, f"vl_{system_type}_windows.json")
+        
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+            print(f"Cleared stored window IDs for {system_type}")
+        return True
+    except Exception as e:
+        print(f"Error clearing window IDs: {e}")
         return False
 
 def get_stored_window_ids(system_type="windows", max_age_seconds=3600):
@@ -661,6 +677,12 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             
             # Find browser windows by process ID
             $browserWindows = Find-WindowsByProcessId
+            
+            # Return error if we didn't find any windows by process ID
+            if ($browserWindows.Count -eq 0) {
+                Write-Host "Found 0 browser windows to position"
+                return "no_windows_found"
+            }
         }
         
         Write-Host "Found $($browserWindows.Count) browser windows to position"
@@ -686,6 +708,8 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             # Small delay to allow system to process
             Start-Sleep -Milliseconds 200
         }
+        
+        return "success"
         '''
         
         # Create a unique script name and directory that's definitely writable in WSL
@@ -701,7 +725,17 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             process_ids_str = ','.join(str(pid) for pid in window_ids)
             
             # Run PowerShell script with process IDs as argument
-            subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path, process_ids_str], check=True)
+            result = subprocess.run(['powershell', '-ExecutionPolicy', 'Bypass', '-File', ps_path, process_ids_str], 
+                                   check=True, capture_output=True, text=True)
+            
+            # Check for no_windows_found in output
+            if "no_windows_found" in result.stdout:
+                print("No windows were found, clearing stored window IDs")
+                system_type = "windows"  # Default system type
+                if "wsl" in platform.platform().lower():
+                    system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
+                clear_stored_window_ids(system_type)
+                return False  # Signal failure so caller can handle it
             
             # Clean up the script file
             try:
@@ -725,7 +759,16 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                 
                 # Run the script from Windows
                 cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File \"{win_path}\" {process_ids_str}"
-                subprocess.run(cmd, shell=True)
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                
+                # Check for no_windows_found in output - be more thorough in checking the stdout
+                if result.stdout and ("no_windows_found" in result.stdout or "Found 0 browser windows" in result.stdout):
+                    print("No windows were found, clearing stored window IDs")
+                    system_type = "windows"  # Default system type
+                    if "wsl" in platform.platform().lower():
+                        system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
+                    clear_stored_window_ids(system_type)
+                    return False  # Signal failure so caller can handle it
                 
                 # Clean up temporary files
                 try:
@@ -749,6 +792,10 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                         $windows[$i].Left = $pos[0]; $windows[$i].Top = $pos[1];
                         $windows[$i].Width = $pos[2]-$pos[0]; $windows[$i].Height = $pos[3]-$pos[1];
                     }
+                    if ($windows.Count -eq 0) {
+                        Write-Host "No windows found with process IDs: @args[0]";
+                        return "no_windows_found";
+                    }
                     '''
                     
                     # Format process IDs as comma-separated string
@@ -756,14 +803,34 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                     
                     # Run PowerShell command directly
                     cmd = f'cd /mnt/c && powershell.exe -Command "{ps_cmd}" "{process_ids_str}"'
-                    subprocess.run(cmd, shell=True)
+                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                    
+                    # Check for no_windows_found in output - be more thorough in checking 
+                    if result.stdout and ("no_windows_found" in result.stdout or "No windows found with process IDs" in result.stdout):
+                        print("No windows were found, clearing stored window IDs")
+                        system_type = "windows"  # Default system type
+                        if "wsl" in platform.platform().lower():
+                            system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
+                        clear_stored_window_ids(system_type)
+                        return False  # Signal failure so caller can handle it
+                    
                 except Exception as e2:
                     print(f"Alternative window positioning also failed: {e2}")
                     print("Window positioning could not be completed")
+                    system_type = "windows"  # Default system type
+                    if "wsl" in platform.platform().lower():
+                        system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
+                    clear_stored_window_ids(system_type)
+                    return False
             
         return True
     except Exception as e:
         print(f"Error positioning windows: {e}")
+        # Clear stored window IDs on error
+        system_type = "windows"  # Default system type
+        if "wsl" in platform.platform().lower():
+            system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
+        clear_stored_window_ids(system_type)
         return False
 
 def open_urls_windows(url1, url2, url3, url4):
@@ -896,11 +963,14 @@ def open_urls_windows(url1, url2, url3, url4):
                     # Position windows
                     try:
                         print("Positioning existing windows...")
-                        temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
-                        position_windows_powershell([int(pid) for pid in existing_pids if pid], chrome_path, [url1, url2, url3, url4], temp_dir)
-                        return
+                        position_result = position_windows_powershell([int(pid) for pid in existing_pids if pid], chrome_path, [url1, url2, url3, url4])
+                        # If position_windows_powershell returns False, windows weren't found, so we'll continue below
+                        # to create new windows
+                        if position_result:
+                            return
                     except Exception as e:
                         print(f"Window positioning failed: {e}")
+                        # Continue to create new windows
                 else:
                     print("Could not reuse stored windows, will detect new ones")
             
@@ -1016,12 +1086,15 @@ def open_urls_windows(url1, url2, url3, url4):
                     # Position windows
                     try:
                         print("Positioning existing windows...")
-                        temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
-                        position_windows_powershell([int(pid) for pid in existing_pids if pid], chrome_path, [url1, url2, url3, url4], temp_dir)
+                        position_result = position_windows_powershell([int(pid) for pid in existing_pids if pid], chrome_path, [url1, url2, url3, url4])
+                        if position_result:
+                            return
+                        else:
+                            # If positioning fails, continue and create new windows
+                            print("Window positioning failed, creating new windows...")
                     except Exception as e:
                         print(f"Window positioning failed: {e}")
-                    
-                    return
+                        # Continue to create new windows
             
             except Exception as e:
                 print(f"Error checking existing windows: {e}")
@@ -1052,8 +1125,7 @@ def open_urls_windows(url1, url2, url3, url4):
             # Try to position windows
             try:
                 print("Positioning windows...")
-                temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
-                position_windows_powershell(process_ids, chrome_path, [url1, url2, url3, url4], temp_dir)
+                position_windows_powershell(process_ids, chrome_path, [url1, url2, url3, url4])
             except Exception as e:
                 print(f"Window positioning failed: {e}")
         else:
@@ -1209,11 +1281,11 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 # Now launch each URL in the appropriate window by using browser command line
                 for ($i = 0; $i -lt [Math]::Min($windows.Count, $urls.Count); $i++) {{
                     try {{
-                        # Use the browser executable to open the URL
+                        # Use the browser executable to open the URL using the window argument
                         Start-Process $browserPath -ArgumentList "--new-tab", $urls[$i];
                         Start-Sleep -Milliseconds 500;
                     }} catch {{
-                        Write-Host "Error opening URL $i";
+                        Write-Host "Error opening URL in window $i";
                     }}
                 }}
                 
@@ -1224,16 +1296,24 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 
                 result_output = result.stdout.strip()
-                if "not_enough_windows" not in result_output and "no_browser" not in result_output:
+                if "not_enough_windows" in result_output:
+                    print("Could not reuse stored windows, will detect new ones")
+                    clear_stored_window_ids("parallels_wsl")
+                else:
                     # Position windows
                     try:
                         print("Positioning existing windows...")
-                        position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
-                        return
+                        position_result = position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                        
+                        # If positioning failed, clear stored window IDs and continue with new detection
+                        if not position_result:
+                            print("Window positioning failed, will try with new windows")
+                            clear_stored_window_ids("parallels_wsl")
+                        else:
+                            return  # Successfully positioned windows
                     except Exception as e:
                         print(f"Window positioning failed: {e}")
-                else:
-                    print("Could not reuse stored windows, will detect new ones")
+                        clear_stored_window_ids("parallels_wsl")
             
             # Check for any existing browser windows
             print("Checking for existing browser windows...")
@@ -1317,11 +1397,19 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                     # Position windows
                     try:
                         print("Positioning existing windows...")
-                        position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                        position_result = position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                        
+                        # If positioning failed, clear stored PIDs and create new windows
+                        if not position_result:
+                            print("Window positioning failed with existing windows, creating new ones...")
+                            clear_stored_window_ids("parallels_wsl")
+                            # Fall through to create new windows
+                        else:
+                            return  # Successfully positioned windows
                     except Exception as e:
                         print(f"Window positioning failed: {e}")
-                    
-                    return
+                        clear_stored_window_ids("parallels_wsl")
+                        # Fall through to create new windows
             except Exception as e:
                 print(f"Error checking for browser windows: {e}")
                 print("Continuing with new windows...")
@@ -1474,7 +1562,7 @@ def open_urls_wsl(url1, url2, url3, url4):
                 # Try to find Edge windows
                 try {
                     $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
                 } catch {};
                 
                 if ($allBrowserWindows.Count -gt 0) {
@@ -1563,11 +1651,15 @@ def open_urls_wsl(url1, url2, url3, url4):
                         # Position windows
                         try:
                             print("Positioning existing windows...")
-                            position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                            position_result = position_windows_powershell([int(pid) for pid in existing_pids if pid], browser_path, [url1, url2, url3, url4])
+                            if position_result:
+                                return
+                            else:
+                                # If positioning fails, continue to create new windows
+                                print("Window positioning failed, creating new windows...")
                         except Exception as e:
                             print(f"Window positioning failed: {e}")
-                        
-                        return
+                            # Continue to create new windows
             except Exception as e:
                 print(f"Error checking for browser windows: {e}")
                 print("Continuing with new windows...")
