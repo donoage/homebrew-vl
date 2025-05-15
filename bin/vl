@@ -12,7 +12,7 @@ import shutil
 import json
 import tempfile
 
-# VL Script Version 3.0.14 - Fix Windows browser URL updating and add global command line support
+# VL Script Version 3.0.15 - Fix PowerShell syntax errors in Windows browser handling
 
 def print_usage():
     """Print usage instructions."""
