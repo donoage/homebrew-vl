@@ -12,7 +12,7 @@ import shutil
 import json
 import tempfile
 
-# VL Script Version 3.0.7 - Fixed window reuse with stored PIDs in Windows/WSL
+# VL Script Version 3.0.11 - Fixed window reuse with stored PIDs in Windows/WSL
 
 def print_usage():
     """Print usage instructions."""
