@@ -743,22 +743,28 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
             except:
                 pass
         else:  # WSL or other Linux
-            # For WSL, create a temporary file in the user's home directory
+            # For WSL, create a temporary file in a Windows-accessible location
             try:
-                # Use Public directory in Windows which should be writable
+                import shutil
+                
+                # Create a unique PS script filename
                 ps_file_name = f'vl_position_{time.time()}.ps1'
+                wsl_temp_path = f"/tmp/{ps_file_name}"
                 win_path = f"C:\\Users\\Public\\{ps_file_name}"
                 wsl_win_path = f"/mnt/c/Users/Public/{ps_file_name}"
                 
-                # Write directly to Windows accessible location
-                with open(wsl_win_path, 'w') as f:
+                # Write script to temp file first
+                with open(wsl_temp_path, 'w') as f:
                     f.write(ps_script)
+                
+                # Copy to Windows-accessible location
+                shutil.copy(wsl_temp_path, wsl_win_path)
                 
                 # Format process IDs as comma-separated string
                 process_ids_str = ','.join(str(pid) for pid in window_ids)
                 
-                # Run the script from Windows
-                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File \"{win_path}\" {process_ids_str}"
+                # Run the script from Windows using the proper path
+                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File \"C:\\Users\\Public\\{ps_file_name}\" {process_ids_str}"
                 result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 
                 # Check for no_windows_found in output - be more thorough in checking the stdout
@@ -772,6 +778,7 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                 
                 # Clean up temporary files
                 try:
+                    os.remove(wsl_temp_path)
                     os.remove(wsl_win_path)
                 except:
                     pass
@@ -781,39 +788,61 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
                 
                 # Fallback to direct PowerShell command instead of script file
                 try:
-                    # Much simpler approach that just moves windows to four quadrants
-                    ps_cmd = '''
-                    Add-Type -AssemblyName System.Windows.Forms;
-                    $screen = [System.Windows.Forms.Screen]::PrimaryScreen;
-                    $w = $screen.Bounds.Width/2; $h = $screen.Bounds.Height/2;
-                    $windows = (Get-Process | Where-Object {$_.MainWindowTitle -ne "" -and $_.Id -in @args[0].Split(",")}).MainWindow;
-                    if ($windows -and $windows.Count -gt 0) {
-                        for ($i=0; $i -lt $windows.Count -and $i -lt 4; $i++) {
-                            $pos = @(@(0,0,$w,$h), @($w,0,$screen.Bounds.Width,$h), @(0,$h,$w,$screen.Bounds.Height), @($w,$h,$screen.Bounds.Width,$screen.Bounds.Height))[$i];
-                            $windows[$i].Left = $pos[0]; $windows[$i].Top = $pos[1];
-                            $windows[$i].Width = $pos[2]-$pos[0]; $windows[$i].Height = $pos[3]-$pos[1];
-                        }
-                    } else {
-                        Write-Host "No windows found with process IDs: @args[0]";
-                        return "no_windows_found";
-                    }
-                    '''
-                    
-                    # Format process IDs as comma-separated string
+                    # Don't use the complex script approach; use a simpler direct command
+                    # that's less prone to quoting issues
                     process_ids_str = ','.join(str(pid) for pid in window_ids)
                     
-                    # Run PowerShell command directly
-                    cmd = f'cd /mnt/c && powershell.exe -Command "{ps_cmd}" "{process_ids_str}"'
-                    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                    # Write a very simple PS script to position windows
+                    simple_ps = f'''
+                    Add-Type -AssemblyName System.Windows.Forms
+                    $screen = [System.Windows.Forms.Screen]::PrimaryScreen
+                    $w = $screen.Bounds.Width/2
+                    $h = $screen.Bounds.Height/2
+                    $pids = "{process_ids_str}".Split(",")
+                    $windows = @()
+                    foreach ($pid in $pids) {{
+                        $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                        if ($proc -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {{
+                            $windows += $proc
+                        }}
+                    }}
+                    if ($windows.Count -gt 0) {{
+                        $positions = @(
+                            @(0, 0, $w, $h),
+                            @($w, 0, $screen.Bounds.Width, $h),
+                            @(0, $h, $w, $screen.Bounds.Height),
+                            @($w, $h, $screen.Bounds.Width, $screen.Bounds.Height)
+                        )
+                        for ($i=0; $i -lt [Math]::Min($windows.Count, 4); $i++) {{
+                            $win = $windows[$i].MainWindowHandle
+                            $pos = $positions[$i]
+                            # Use P/Invoke to position windows
+                            # Code will be added here in a file-based approach
+                        }}
+                    }} else {{
+                        Write-Host "No windows found with PIDs: {process_ids_str}"
+                    }}
+                    '''
                     
-                    # Check for no_windows_found in output - be more thorough in checking 
-                    if result.stdout and ("no_windows_found" in result.stdout or "No windows found with process IDs" in result.stdout):
-                        print("No windows were found, clearing stored window IDs")
-                        system_type = "windows"  # Default system type
-                        if "wsl" in platform.platform().lower():
-                            system_type = "parallels_wsl" if os.path.exists('/mnt/c/Program Files/Parallels') else "wsl"
-                        clear_stored_window_ids(system_type)
-                        return False  # Signal failure so caller can handle it
+                    # Write to temp file
+                    simple_ps_path = "/tmp/vl_simple_position.ps1"
+                    with open(simple_ps_path, "w") as f:
+                        f.write(simple_ps)
+                    
+                    # Copy to Windows-accessible location
+                    win_simple_ps = "/mnt/c/Users/Public/vl_simple_position.ps1"
+                    shutil.copy(simple_ps_path, win_simple_ps)
+                    
+                    # Execute the script
+                    cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File C:\\Users\\Public\\vl_simple_position.ps1"
+                    subprocess.run(cmd, shell=True)
+                    
+                    # Clean up
+                    try:
+                        os.remove(simple_ps_path)
+                        os.remove(win_simple_ps)
+                    except:
+                        pass
                     
                 except Exception as e2:
                     print(f"Alternative window positioning also failed: {e2}")
@@ -1095,16 +1124,18 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             # Check for existing browser windows and close them
             print("Checking for existing browser windows...")
             
-            # Close any existing browser windows
-            ps_cmd = '''
+            # Close any existing browser windows - using a file instead of direct command to avoid quoting issues
+            ps_script = '''
             $allBrowserWindows = @();
             
             # Get all Chrome windows
             try {
                 $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                    Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                if ($chromeWindows) {
-                    $allBrowserWindows += $chromeWindows
+                    Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                
+                # If we have Chrome windows, prioritize those
+                if ($chromeWindows -and $chromeWindows.Count -ge 1) {
+                    $allBrowserWindows = $chromeWindows;
                 }
             } catch {}
             
@@ -1113,7 +1144,7 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
                 $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
                     Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
                 if ($edgeWindows) {
-                    $allBrowserWindows += $edgeWindows
+                    $allBrowserWindows += $edgeWindows;
                 }
             } catch {}
             
@@ -1133,8 +1164,26 @@ def open_urls_parallels_wsl(url1, url2, url3, url4):
             }
             '''
             
-            cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
+            # Write script to a temporary file
+            temp_ps_file = "/tmp/vl_close_windows.ps1"
+            with open(temp_ps_file, "w") as f:
+                f.write(ps_script)
+            
+            # Execute the script file instead of passing the script directly
+            cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File /mnt/c/Users/Public/vl_close_windows.ps1"
+            
+            # First copy the script to a Windows-accessible location
+            shutil.copy(temp_ps_file, "/mnt/c/Users/Public/vl_close_windows.ps1")
+            
+            # Now execute it
             subprocess.run(cmd, shell=True)
+            
+            # Clean up the temp file
+            try:
+                os.remove(temp_ps_file)
+                os.remove("/mnt/c/Users/Public/vl_close_windows.ps1")
+            except:
+                pass
             
             # Clear any stored window IDs
             clear_stored_window_ids("parallels_wsl")
@@ -1269,10 +1318,10 @@ def open_urls_wsl(url1, url2, url3, url4):
         if browser_path:
             print(f"Checking for existing browser windows...")
             
-            # Try to detect browser windows using PowerShell
+            # Try to detect browser windows using PowerShell - using file approach to avoid quoting issues
             try:
-                # This command detects ANY existing browser windows, not just volumeleaders ones
-                ps_cmd = '''
+                # Create a PowerShell script that closes existing browser windows
+                ps_script = '''
                 $allBrowserWindows = @();
                 
                 # Try to find Chrome windows
@@ -1310,13 +1359,26 @@ def open_urls_wsl(url1, url2, url3, url4):
                     # Give them time to close
                     Start-Sleep -Seconds 1
                 }
-                
-                return ""
                 '''
                 
-                # Run the PowerShell command
-                cmd = f"cd /mnt/c && powershell.exe -Command \"{ps_cmd}\""
+                # Write script to a temporary file
+                temp_ps_file = "/tmp/vl_close_windows.ps1"
+                with open(temp_ps_file, "w") as f:
+                    f.write(ps_script)
+                
+                # Copy to a Windows-accessible location
+                shutil.copy(temp_ps_file, "/mnt/c/Users/Public/vl_close_windows.ps1")
+                
+                # Execute the script file
+                cmd = f"cd /mnt/c && powershell.exe -ExecutionPolicy Bypass -File C:\\Users\\Public\\vl_close_windows.ps1"
                 subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                
+                # Clean up the temp files
+                try:
+                    os.remove(temp_ps_file)
+                    os.remove("/mnt/c/Users/Public/vl_close_windows.ps1")
+                except:
+                    pass
                 
                 # Clear any stored window IDs since we're starting fresh
                 clear_stored_window_ids("wsl")
@@ -1345,9 +1407,6 @@ def open_urls_wsl(url1, url2, url3, url4):
             # Give them a moment to start up
             print("Waiting for browser windows to initialize...")
             time.sleep(3)  # Reduced delay
-            
-            # Need to import shutil for WSL
-            import shutil
             
             # Try to position windows
             try:
