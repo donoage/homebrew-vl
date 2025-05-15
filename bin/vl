@@ -12,7 +12,7 @@ import shutil
 import json
 import tempfile
 
-# VL Script Version 3.0.12 - Fixed URL passing to existing windows on Windows/WSL
+# VL Script Version 3.0.13 - Prioritize Chrome over Edge on Windows/WSL
 
 def print_usage():
     """Print usage instructions."""
@@ -979,30 +979,31 @@ def open_urls_windows(url1, url2, url3, url4):
             try:
                 # This command detects ANY existing browser windows, not just volumeleaders ones
                 ps_cmd = '''
-                function Find-AllBrowserWindows {
-                    # Get all Chrome windows
-                    $chromeWindows = @()
-                    try {
-                        $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
-                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                    } catch {}
+                $allBrowserWindows = @();
+                
+                # Try to find Chrome windows
+                try {
+                    $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
                     
-                    # Get all Edge windows
-                    $edgeWindows = @()
+                    # If we have Chrome windows, prioritize those
+                    if ($chromeWindows.Count -ge 1) {
+                        $allBrowserWindows = $chromeWindows;
+                    }
+                } catch {};
+                
+                # Only look for Edge windows if we don't have enough Chrome windows
+                if ($allBrowserWindows.Count -lt 1) {
                     try {
                         $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
                             Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                    } catch {}
-                    
-                    # Combine all browser windows and take up to 4
-                    $browserWindows = @($chromeWindows) + @($edgeWindows) | Select-Object -First 4
-                    return $browserWindows
+                        $allBrowserWindows += $edgeWindows;
+                    } catch {};
                 }
                 
-                $browserWindows = Find-AllBrowserWindows
-                
-                if ($browserWindows.Count -gt 0) {
-                    return [string]::Join(",", ($browserWindows | ForEach-Object { $_.Id }))
+                if ($allBrowserWindows.Count -gt 0) {
+                    $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
+                    return [string]::Join(",", ($allBrowserWindows | ForEach-Object { $_.Id }))
                 } else {
                     return ""
                 }
@@ -1580,15 +1581,23 @@ def open_urls_wsl(url1, url2, url3, url4):
                 
                 # Try to find Chrome windows
                 try {
-                    $allBrowserWindows += Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
+                    $chromeWindows = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | 
                         Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero};
+                    
+                    # If we have Chrome windows, prioritize those
+                    if ($chromeWindows.Count -ge 1) {
+                        $allBrowserWindows = $chromeWindows;
+                    }
                 } catch {};
                 
-                # Try to find Edge windows
-                try {
-                    $allBrowserWindows += Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
-                        Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
-                } catch {};
+                # Only look for Edge windows if we don't have enough Chrome windows
+                if ($allBrowserWindows.Count -lt 1) {
+                    try {
+                        $edgeWindows = Get-Process -Name "msedge" -ErrorAction SilentlyContinue | 
+                            Where-Object {$_.MainWindowTitle -ne "" -and $_.MainWindowHandle -ne [IntPtr]::Zero}
+                        $allBrowserWindows += $edgeWindows;
+                    } catch {};
+                }
                 
                 if ($allBrowserWindows.Count -gt 0) {
                     $allBrowserWindows = $allBrowserWindows | Select-Object -First 4;
