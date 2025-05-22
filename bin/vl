@@ -13,6 +13,7 @@ import json
 import tempfile
 
 # VL Script Version 3.0.16 - Fix PowerShell execution in WSL to avoid shell misinterpretation
+# VL Script Version 3.0.17 - Prevent closing of extra browser windows
 
 def print_usage():
     """Print usage instructions."""
@@ -333,13 +334,14 @@ def open_urls_macos(url1, url2, url3, url4):
                     end repeat
                 end if
                 
-                # Close any excess windows beyond 4
+                # MODIFIED: Don't close excess windows, just use the first 4
                 if (count of targetWindows) > 4 then
-                    log "Found " & (count of targetWindows) & " windows, closing excess..."
-                    repeat with i from 5 to (count of targetWindows)
-                        close window i
-                    end repeat
-                    # Now we only have 4 windows
+                    log "Found " & (count of targetWindows) & " windows, using first 4 only..."
+                    # Don't close extra windows
+                    # repeat with i from 5 to (count of targetWindows)
+                    #     close window i
+                    # end repeat
+                    # Now we only use the first 4 windows
                     set targetWindows to items 1 through 4 of targetWindows
                 end if
                 
@@ -592,27 +594,28 @@ def position_windows_powershell(window_ids, browser_path, urls, temp_dir=None):
         # Find all VolumeLeaders windows
         $browserWindows = Find-VolumeLeadersWindows
         
-        # Close excess browser windows if we found more than 4
+        # MODIFIED: Don't close extra browser windows, just use the first 4
         if ($browserWindows -and $browserWindows.Count -gt 4) {
-            Write-Host "Found $($browserWindows.Count) browser windows, closing excess windows..."
+            Write-Host "Found $($browserWindows.Count) browser windows, using first 4 only..."
             
-            # Sort windows to close the newest ones first (assuming they're the extras)
-            $windowsToClose = $browserWindows | Select-Object -Skip 4
-            
-            foreach ($window in $windowsToClose) {
-                try {
-                    # Try to close the window by sending Alt+F4
-                    [Win32]::SetForegroundWindow($window.Handle) | Out-Null
-                    Start-Sleep -Milliseconds 100
-                    
-                    # Send Alt+F4 to close the window
-                    Add-Type -AssemblyName System.Windows.Forms
-                    [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
-                    Start-Sleep -Milliseconds 200
-                } catch {
-                    Write-Host "Failed to close extra window: $_"
-                }
-            }
+            # Don't close excess windows
+            # # Sort windows to close the newest ones first (assuming they're the extras)
+            # $windowsToClose = $browserWindows | Select-Object -Skip 4
+            # 
+            # foreach ($window in $windowsToClose) {
+            #     try {
+            #         # Try to close the window by sending Alt+F4
+            #         [Win32]::SetForegroundWindow($window.Handle) | Out-Null
+            #         Start-Sleep -Milliseconds 100
+            #         
+            #         # Send Alt+F4 to close the window
+            #         Add-Type -AssemblyName System.Windows.Forms
+            #         [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
+            #         Start-Sleep -Milliseconds 200
+            #     } catch {
+            #         Write-Host "Failed to close extra window: $_"
+            #     }
+            # }
             
             # Update our list to only use the first 4 windows
             $browserWindows = $browserWindows | Select-Object -First 4
