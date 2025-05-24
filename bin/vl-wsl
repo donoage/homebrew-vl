@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# VL Script WSL wrapper - Version 1.0.0
+# This script is for running the vl command from WSL, using the Windows browser
+
+# Get the ticker from command line
+if [ -z "$1" ]; then
+    echo "Usage: vl-wsl TICKER"
+    echo "Example: vl-wsl AAPL"
+    exit 1
+fi
+
+TICKER="$1"
+SCRIPT_PATH=$(readlink -f "$0")
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+WINDOWS_SCRIPT="${SCRIPT_DIR}/vl-windows.py"
+
+# Convert to Windows path
+WIN_SCRIPT_PATH=$(wslpath -w "$WINDOWS_SCRIPT")
+
+# Run the Python script through PowerShell
+echo "Running VL Windows script for ticker: $TICKER"
+powershell.exe -ExecutionPolicy Bypass -Command "python '$WIN_SCRIPT_PATH' '$TICKER'" 
