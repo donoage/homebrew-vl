@@ -14,7 +14,7 @@ import tempfile
 import argparse
 
 # VL Script Version for Windows 1.0.0 - Improved positioning and window reuse
-# Based on VL Script Version 3.0.25 - Add -i flag for index mode (SPY and QQQ charts)
+# Based on VL Script Version 3.0.26 - Use 3-day range for index charts
 
 def print_usage():
     """Print usage instructions."""
@@ -590,20 +590,21 @@ def main():
     three_months_ago = (datetime.date.today() - datetime.timedelta(days=90)).strftime("%Y-%m-%d")
     one_month_ago = (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
     one_week_ago = (datetime.date.today() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    three_days_ago = (datetime.date.today() - datetime.timedelta(days=3)).strftime("%Y-%m-%d")
     
     # Check if we're in index mode
     if args.index:
-        print("Index mode: Displaying SPY and QQQ charts")
+        print("Index mode: Displaying SPY and QQQ charts with 3-day range")
         
-        # URLs for SPY (today only)
-        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={today}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        # URLs for SPY (3-day range)
+        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={today}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=6000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=6000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        # URLs for QQQ (today only)
-        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={today}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        # URLs for QQQ (3-day range)
+        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={today}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=6000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=6000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     else:
         # Regular mode with user-specified ticker
