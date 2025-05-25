@@ -1,23 +1,21 @@
 #!/bin/bash
 
-# VL Script WSL wrapper - Version 1.0.0
-# This script is for running the vl command from WSL, using the Windows browser
+# VL WSL Wrapper 1.0.1 - Support -i flag for index mode
 
-# Get the ticker from command line
-if [ -z "$1" ]; then
-    echo "Usage: vl-wsl TICKER"
-    echo "Example: vl-wsl AAPL"
+# Check if python is available
+if ! command -v python3 &> /dev/null; then
+    echo "Python 3 is required but not found. Please install Python 3."
     exit 1
 fi
 
-TICKER="$1"
-SCRIPT_PATH=$(readlink -f "$0")
-SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+# Check if vl-windows.py exists
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 WINDOWS_SCRIPT="${SCRIPT_DIR}/vl-windows.py"
 
-# Convert to Windows path
-WIN_SCRIPT_PATH=$(wslpath -w "$WINDOWS_SCRIPT")
+if [ ! -f "$WINDOWS_SCRIPT" ]; then
+    echo "Error: Windows helper script not found at $WINDOWS_SCRIPT"
+    exit 1
+fi
 
-# Run the Python script through PowerShell
-echo "Running VL Windows script for ticker: $TICKER"
-powershell.exe -ExecutionPolicy Bypass -Command "python '$WIN_SCRIPT_PATH' '$TICKER'" 
+# Pass all arguments to the Windows script
+python3 "$WINDOWS_SCRIPT" "$@" 
