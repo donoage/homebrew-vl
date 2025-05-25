@@ -14,7 +14,7 @@ import tempfile
 import argparse
 
 # VL Script Version for Windows 1.0.0 - Improved positioning and window reuse
-# Based on VL Script Version 3.0.21
+# Based on VL Script Version 3.0.22 - Set MinDollars to 0 for DarkPools and Sweeps URLs
 
 def print_usage():
     """Print usage instructions."""
@@ -592,11 +592,11 @@ def main():
     # Construct URLs with the provided ticker and dates
     url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_months_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
-    url2 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=5000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+    url2 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     url3 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
-    url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_week_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=5000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+    url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_week_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     urls = [url1, url2, url3, url4]
     
