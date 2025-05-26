@@ -40,6 +40,29 @@ The tool opens four windows in a 2x2 grid:
 3. Bottom-Left: 1-month chart
 4. Bottom-Right: 1-week chart with dark pools and sweeps
 
+## RunVL Index App
+
+For quick access to index charts (SPY and QQQ), you can:
+
+1. Use the command line: `vl -i`
+2. Use the provided RunVLIndex app in your Applications folder
+
+### Setting up the RunVLIndex App
+
+The repository includes a `RunVLIndex.scpt` AppleScript file that can be compiled into an application:
+
+```bash
+# Compile the script into an application
+osacompile -o ~/Applications/RunVLIndex.app RunVLIndex.scpt
+```
+
+This creates a standalone app that runs the `vl -i` command when launched, displaying SPY and QQQ charts.
+
+You can:
+- Add it to your Dock for quick access
+- Launch it from Spotlight
+- Assign a keyboard shortcut to it using macOS Automator or third-party tools
+
 ## License
 
 MIT 
