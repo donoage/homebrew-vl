@@ -23,13 +23,40 @@ import argparse
 # VL Script Version 3.0.26 - Use 3-day range for index charts
 # VL Script Version 3.0.27 - Set MinDollars=0 for all URLs with Sweeps=1
 # VL Script Version 3.0.28 - Remove Windows and WSL related code
+# VL Script Version 3.0.29 - Use 3 trading days instead of calendar days for index mode
+# Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
+# 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
 def print_usage():
     """Print usage instructions."""
     print("Usage: vl TICKER")
-    print("       vl -i    (Index mode: SPY and QQQ)")
+    print("       vl -i    (Index mode: SPY and QQQ charts)")
     print("Example: vl AAPL")
     sys.exit(1)
+
+def is_trading_day(date):
+    """Check if a date is a trading day (Monday-Friday, no holidays)."""
+    # Check if it's a weekend
+    if date.weekday() >= 5:  # 5=Saturday, 6=Sunday
+        return False
+    
+    # For simplicity, we're not checking holidays
+    # A full implementation would need to check US market holidays
+    return True
+
+def get_previous_trading_days(days_count):
+    """Get the date for N trading days ago."""
+    today = datetime.date.today()
+    days_found = 0
+    days_back = 0
+    
+    while days_found < days_count:
+        days_back += 1
+        check_date = today - datetime.timedelta(days=days_back)
+        if is_trading_day(check_date):
+            days_found += 1
+    
+    return check_date.strftime("%Y-%m-%d")
 
 def main():
     """Main function."""
@@ -52,21 +79,22 @@ def main():
     three_months_ago = (datetime.date.today() - datetime.timedelta(days=90)).strftime("%Y-%m-%d")
     one_month_ago = (datetime.date.today() - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
     one_week_ago = (datetime.date.today() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-    three_days_ago = (datetime.date.today() - datetime.timedelta(days=3)).strftime("%Y-%m-%d")
     
     # Check if we're in index mode
     if args.index:
-        print("Index mode: Displaying SPY and QQQ charts with 3-day range")
+        # Get date for 3 trading days ago (accounting for weekends)
+        three_trading_days_ago = get_previous_trading_days(3)
+        print(f"Index mode: Displaying SPY and QQQ charts with 3 trading days range (since {three_trading_days_ago})")
         
-        # URLs for SPY (3-day range)
-        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        # URLs for SPY (3 trading days range)
+        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        # URLs for QQQ (3-day range)
-        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        # URLs for QQQ (3 trading days range)
+        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={three_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     else:
         # Regular mode with user-specified ticker
