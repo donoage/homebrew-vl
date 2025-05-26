@@ -1,16 +1,7 @@
 -- RunVLIndex.scpt
--- AppleScript to run vl in index mode (SPY and QQQ charts)
+-- AppleScript to run vl command in index mode (SPY and QQQ)
 
 on run
-    -- The most direct approach: run the command through Terminal
-    tell application "Terminal"
-        -- Run the vl command in index mode
-        do script "/opt/homebrew/bin/vl -i"
-        
-        -- Wait a moment
-        delay 1
-        
-        -- Close the terminal window
-        close (first window)
-    end tell
+	-- Run the vl command with the index flag
+	do shell script "/opt/homebrew/bin/vl -i"
 end run 
