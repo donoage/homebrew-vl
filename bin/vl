@@ -24,6 +24,7 @@ import argparse
 # VL Script Version 3.0.27 - Set MinDollars=0 for all URLs with Sweeps=1
 # VL Script Version 3.0.28 - Remove Windows and WSL related code
 # VL Script Version 3.0.29 - Use 3 trading days instead of calendar days for index mode
+# VL Script Version 3.0.30 - Set TradeCount from 10 to 6 for all URLs
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
@@ -87,14 +88,14 @@ def main():
         print(f"Index mode: Displaying SPY and QQQ charts with 3 trading days range (since {three_trading_days_ago})")
         
         # URLs for SPY (3 trading days range)
-        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=SPY&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
         # URLs for QQQ (3 trading days range)
-        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={three_trading_days_ago}&EndDate={today}&Ticker=QQQ&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     else:
         # Regular mode with user-specified ticker
@@ -106,13 +107,13 @@ def main():
         print(f"Using ticker: {ticker}")
         
         # Construct URLs with the provided ticker and dates
-        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_months_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_months_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url3 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_week_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_week_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=6&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     # Detect operating system
     system = platform.system()
