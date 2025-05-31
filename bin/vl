@@ -27,6 +27,7 @@ import argparse
 # VL Script Version 3.0.30 - Set TradeCount from 10 to 6 for all URLs
 # VL Script Version 3.0.31 - Set TradeCount from 6 to 5 for all URLs
 # VL Script Version 3.0.32 - Improve screen size detection with multiple fallback methods
+# VL Script Version 3.0.33 - Add multi-display support and accurate logical resolution detection
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
@@ -130,29 +131,89 @@ def main():
 def get_screen_dimensions_macos():
     """Get screen dimensions on macOS using multiple methods."""
     
-    # Method 1: Try using system_profiler (most reliable)
+    # Method 1: Try AppleScript with Finder (gets logical/scaled resolution)
+    applescript_finder = '''
+    tell application "Finder"
+        set _bounds to bounds of window of desktop
+        set screenWidth to item 3 of _bounds
+        set screenHeight to item 4 of _bounds
+        return (screenWidth as string) & "," & (screenHeight as string)
+    end tell
+    '''
+    
     try:
-        result = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True)
-        if result.returncode == 0:
-            import re
-            # Look for resolution pattern like "3840 x 2160" or "2560 x 1440"
-            resolution_match = re.search(r'Resolution:\s*(\d+)\s*x\s*(\d+)', result.stdout)
-            if resolution_match:
-                screen_width = int(resolution_match.group(1))
-                screen_height = int(resolution_match.group(2))
-                print(f"Screen dimensions detected via system_profiler: {screen_width}x{screen_height}")
+        result = subprocess.run(["osascript", "-e", applescript_finder], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            output = result.stdout.strip()
+            # Clean up any extra commas or spaces
+            output = output.replace(" ", "").replace(",,", ",")
+            dimensions = output.split(',')
+            if len(dimensions) >= 2 and dimensions[0] and dimensions[1]:
+                screen_width = int(float(dimensions[0]))
+                screen_height = int(float(dimensions[1]))
+                print(f"Screen dimensions detected via AppleScript (Finder - logical resolution): {screen_width}x{screen_height}")
+                
+                # Check if this looks like a multi-display setup
+                if screen_width > 4000:  # Likely multiple displays
+                    # Try to get main display dimensions
+                    main_width, main_height = get_main_display_dimensions()
+                    if main_width and main_height:
+                        print(f"Multi-display setup detected, using main display: {main_width}x{main_height}")
+                        return main_width, main_height
+                    else:
+                        # Fallback: assume dual display and divide by 2
+                        main_width = screen_width // 2
+                        print(f"Multi-display setup detected, estimated main display: {main_width}x{screen_height}")
+                        return main_width, screen_height
+                
                 return screen_width, screen_height
     except Exception as e:
-        print(f"system_profiler method failed: {e}")
+        print(f"AppleScript Finder method failed: {e}")
     
-    # Method 2: Try AppleScript with System Events (more modern)
+    # Method 2: Try a simpler AppleScript approach
+    applescript_simple = '''
+    tell application "Finder"
+        get bounds of window of desktop
+    end tell
+    '''
+    
+    try:
+        result = subprocess.run(["osascript", "-e", applescript_simple], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            # Parse output like "0, 0, 6400, 1800"
+            output = result.stdout.strip()
+            # Remove any extra spaces and split by comma
+            parts = [part.strip() for part in output.split(',')]
+            if len(parts) >= 4:
+                screen_width = int(float(parts[2]))
+                screen_height = int(float(parts[3]))
+                print(f"Screen dimensions detected via AppleScript (Finder - simple): {screen_width}x{screen_height}")
+                
+                # Check if this looks like a multi-display setup
+                if screen_width > 4000:  # Likely multiple displays
+                    # Try to get main display dimensions
+                    main_width, main_height = get_main_display_dimensions()
+                    if main_width and main_height:
+                        print(f"Multi-display setup detected, using main display: {main_width}x{main_height}")
+                        return main_width, main_height
+                    else:
+                        # Fallback: assume dual display and divide by 2
+                        main_width = screen_width // 2
+                        print(f"Multi-display setup detected, estimated main display: {main_width}x{screen_height}")
+                        return main_width, screen_height
+                
+                return screen_width, screen_height
+    except Exception as e:
+        print(f"AppleScript simple method failed: {e}")
+    
+    # Method 3: Try AppleScript with System Events (more modern, gets logical resolution)
     applescript_modern = '''
     tell application "System Events"
         tell first desktop
             set screenBounds to bounds
             set screenWidth to item 3 of screenBounds
             set screenHeight to item 4 of screenBounds
-            return screenWidth & "," & screenHeight
+            return (screenWidth as string) & "," & (screenHeight as string)
         end tell
     end tell
     '''
@@ -164,34 +225,24 @@ def get_screen_dimensions_macos():
             if len(dimensions) == 2:
                 screen_width = int(float(dimensions[0]))
                 screen_height = int(float(dimensions[1]))
-                print(f"Screen dimensions detected via AppleScript (System Events): {screen_width}x{screen_height}")
+                print(f"Screen dimensions detected via AppleScript (System Events - logical resolution): {screen_width}x{screen_height}")
                 return screen_width, screen_height
     except Exception as e:
         print(f"AppleScript System Events method failed: {e}")
     
-    # Method 3: Try the original Finder method
-    applescript_finder = '''
-    tell application "Finder"
-        set _bounds to bounds of window of desktop
-        set screenWidth to item 3 of _bounds
-        set screenHeight to item 4 of _bounds
-        return screenWidth & "," & screenHeight
-    end tell
-    '''
-    
+    # Method 4: Try using Python's built-in methods if available (gets logical resolution)
     try:
-        result = subprocess.run(["osascript", "-e", applescript_finder], capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip():
-            dimensions = result.stdout.strip().split(',')
-            if len(dimensions) == 2:
-                screen_width = int(float(dimensions[0]))
-                screen_height = int(float(dimensions[1]))
-                print(f"Screen dimensions detected via AppleScript (Finder): {screen_width}x{screen_height}")
-                return screen_width, screen_height
+        import tkinter as tk
+        root = tk.Tk()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()
+        print(f"Screen dimensions detected via tkinter (logical resolution): {screen_width}x{screen_height}")
+        return screen_width, screen_height
     except Exception as e:
-        print(f"AppleScript Finder method failed: {e}")
+        print(f"tkinter method failed: {e}")
     
-    # Method 4: Try using osascript with display properties
+    # Method 5: Try using osascript with display properties
     applescript_display = '''
     tell application "System Events"
         set _display to first display
@@ -211,17 +262,27 @@ def get_screen_dimensions_macos():
     except Exception as e:
         print(f"AppleScript Display method failed: {e}")
     
-    # Method 5: Try using Python's built-in methods if available
+    # Method 6: Try using system_profiler (gets physical resolution - use as last resort)
     try:
-        import tkinter as tk
-        root = tk.Tk()
-        screen_width = root.winfo_screenwidth()
-        screen_height = root.winfo_screenheight()
-        root.destroy()
-        print(f"Screen dimensions detected via tkinter: {screen_width}x{screen_height}")
-        return screen_width, screen_height
+        result = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True)
+        if result.returncode == 0:
+            import re
+            # Look for resolution pattern like "3840 x 2160" or "2560 x 1440"
+            resolution_match = re.search(r'Resolution:\s*(\d+)\s*x\s*(\d+)', result.stdout)
+            if resolution_match:
+                screen_width = int(resolution_match.group(1))
+                screen_height = int(resolution_match.group(2))
+                print(f"Screen dimensions detected via system_profiler (physical resolution): {screen_width}x{screen_height}")
+                # For high-DPI displays, the physical resolution might be 2x the logical resolution
+                # Try to detect if this is a Retina display and adjust accordingly
+                if screen_width >= 4000 or screen_height >= 2000:
+                    logical_width = screen_width // 2
+                    logical_height = screen_height // 2
+                    print(f"Detected high-DPI display, using logical resolution: {logical_width}x{logical_height}")
+                    return logical_width, logical_height
+                return screen_width, screen_height
     except Exception as e:
-        print(f"tkinter method failed: {e}")
+        print(f"system_profiler method failed: {e}")
     
     # Fallback: Use common macOS resolutions based on detection
     print("All screen detection methods failed, using intelligent fallback...")
@@ -230,12 +291,12 @@ def get_screen_dimensions_macos():
     try:
         result = subprocess.run(["system_profiler", "SPHardwareDataType"], capture_output=True, text=True)
         if "MacBook" in result.stdout:
-            # Common MacBook resolutions
-            print("Detected MacBook - using 2560x1600 (common MacBook Pro resolution)")
-            return 2560, 1600
+            # Common MacBook logical resolutions
+            print("Detected MacBook - using 1680x1050 (common MacBook Pro logical resolution)")
+            return 1680, 1050
         else:
             # Assume external display
-            print("Detected desktop Mac - using 2560x1440 (common external display resolution)")
+            print("Detected desktop Mac - using 2560x1440 (common external display logical resolution)")
             return 2560, 1440
     except:
         pass
@@ -243,6 +304,98 @@ def get_screen_dimensions_macos():
     # Final fallback
     print("Using final fallback resolution: 2560x1440")
     return 2560, 1440
+
+def get_main_display_dimensions():
+    """Try to get the dimensions of just the main display."""
+    try:
+        # Try to get main display info using AppleScript
+        applescript = '''
+        tell application "System Events"
+            set mainDisplay to first display whose value of attribute "AXMain" is true
+            return (value of mainDisplay's width) & "," & (value of mainDisplay's height)
+        end tell
+        '''
+        
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            dimensions = result.stdout.strip().split(',')
+            if len(dimensions) == 2:
+                width = int(float(dimensions[0]))
+                height = int(float(dimensions[1]))
+                print(f"Main display detected via AppleScript: {width}x{height}")
+                return width, height
+    except Exception as e:
+        print(f"Main display detection failed: {e}")
+    
+    # If AppleScript fails, try to estimate from total resolution
+    # Since we know the total is 6400x1800 and we have 2 displays, each should be 3200x1800
+    try:
+        # Get total resolution again
+        applescript_total = '''
+        tell application "Finder"
+            set _bounds to bounds of window of desktop
+            set screenWidth to item 3 of _bounds
+            set screenHeight to item 4 of _bounds
+            return (screenWidth as string) & "," & (screenHeight as string)
+        end tell
+        '''
+        
+        result = subprocess.run(["osascript", "-e", applescript_total], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            output = result.stdout.strip()
+            output = output.replace(" ", "").replace(",,", ",")
+            dimensions = output.split(',')
+            if len(dimensions) >= 2 and dimensions[0] and dimensions[1]:
+                total_width = int(float(dimensions[0]))
+                total_height = int(float(dimensions[1]))
+                
+                # For dual display setup, assume each display is half the total width
+                if total_width > 4000:  # Multi-display
+                    main_width = total_width // 2
+                    print(f"Estimated main display from total resolution: {main_width}x{total_height}")
+                    return main_width, total_height
+    except Exception as e:
+        print(f"Total resolution estimation failed: {e}")
+    
+    # Try alternative method using system_profiler to find main display
+    try:
+        result = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True)
+        if result.returncode == 0:
+            import re
+            # Look for the main display (marked with "Main Display: Yes")
+            lines = result.stdout.split('\n')
+            main_display_section = False
+            for i, line in enumerate(lines):
+                if "Main Display: Yes" in line:
+                    # Look backwards for the resolution
+                    for j in range(i-10, i):
+                        if j >= 0 and "Resolution:" in lines[j]:
+                            resolution_match = re.search(r'Resolution:\s*(\d+)\s*x\s*(\d+)', lines[j])
+                            if resolution_match:
+                                width = int(resolution_match.group(1))
+                                height = int(resolution_match.group(2))
+                                print(f"Main display physical resolution: {width}x{height}")
+                                # For Studio Display at 5120x2880, the logical resolution depends on scaling
+                                # Based on the total logical resolution being 6400x1800 for 2 displays,
+                                # each display should be 3200x1800 logical
+                                if width == 5120 and height == 2880:
+                                    logical_width = 3200
+                                    logical_height = 1800
+                                    print(f"Converted to logical resolution: {logical_width}x{logical_height}")
+                                    return logical_width, logical_height
+                                # For other high-DPI displays, use the standard 2x scaling
+                                elif width >= 4000 or height >= 2000:
+                                    width = width // 2
+                                    height = height // 2
+                                    print(f"Standard 2x scaling applied: {width}x{height}")
+                                    return width, height
+                                else:
+                                    return width, height
+                            break
+    except Exception as e:
+        print(f"system_profiler main display detection failed: {e}")
+    
+    return None, None
 
 def open_urls_macos(url1, url2, url3, url4):
     """Open URLs on macOS with Chrome and position windows."""
