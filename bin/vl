@@ -26,6 +26,7 @@ import argparse
 # VL Script Version 3.0.29 - Use 3 trading days instead of calendar days for index mode
 # VL Script Version 3.0.30 - Set TradeCount from 10 to 6 for all URLs
 # VL Script Version 3.0.31 - Set TradeCount from 6 to 5 for all URLs
+# VL Script Version 3.0.32 - Improve screen size detection with multiple fallback methods
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
@@ -127,8 +128,49 @@ def main():
         open_urls_default(url1, url2, url3, url4)
 
 def get_screen_dimensions_macos():
-    """Get screen dimensions on macOS using AppleScript."""
-    applescript = '''
+    """Get screen dimensions on macOS using multiple methods."""
+    
+    # Method 1: Try using system_profiler (most reliable)
+    try:
+        result = subprocess.run(["system_profiler", "SPDisplaysDataType"], capture_output=True, text=True)
+        if result.returncode == 0:
+            import re
+            # Look for resolution pattern like "3840 x 2160" or "2560 x 1440"
+            resolution_match = re.search(r'Resolution:\s*(\d+)\s*x\s*(\d+)', result.stdout)
+            if resolution_match:
+                screen_width = int(resolution_match.group(1))
+                screen_height = int(resolution_match.group(2))
+                print(f"Screen dimensions detected via system_profiler: {screen_width}x{screen_height}")
+                return screen_width, screen_height
+    except Exception as e:
+        print(f"system_profiler method failed: {e}")
+    
+    # Method 2: Try AppleScript with System Events (more modern)
+    applescript_modern = '''
+    tell application "System Events"
+        tell first desktop
+            set screenBounds to bounds
+            set screenWidth to item 3 of screenBounds
+            set screenHeight to item 4 of screenBounds
+            return screenWidth & "," & screenHeight
+        end tell
+    end tell
+    '''
+    
+    try:
+        result = subprocess.run(["osascript", "-e", applescript_modern], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            dimensions = result.stdout.strip().split(',')
+            if len(dimensions) == 2:
+                screen_width = int(float(dimensions[0]))
+                screen_height = int(float(dimensions[1]))
+                print(f"Screen dimensions detected via AppleScript (System Events): {screen_width}x{screen_height}")
+                return screen_width, screen_height
+    except Exception as e:
+        print(f"AppleScript System Events method failed: {e}")
+    
+    # Method 3: Try the original Finder method
+    applescript_finder = '''
     tell application "Finder"
         set _bounds to bounds of window of desktop
         set screenWidth to item 3 of _bounds
@@ -138,36 +180,69 @@ def get_screen_dimensions_macos():
     '''
     
     try:
-        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
-        if result.stdout.strip():
+        result = subprocess.run(["osascript", "-e", applescript_finder], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
             dimensions = result.stdout.strip().split(',')
             if len(dimensions) == 2:
                 screen_width = int(float(dimensions[0]))
                 screen_height = int(float(dimensions[1]))
+                print(f"Screen dimensions detected via AppleScript (Finder): {screen_width}x{screen_height}")
                 return screen_width, screen_height
-        
-        # If we got here, try an alternative method
-        applescript_alt = '''
-        tell application "System Events"
-            set _display to first display
-            return (value of _display's width) & "," & (value of _display's height)
-        end tell
-        '''
-        
-        result = subprocess.run(["osascript", "-e", applescript_alt], capture_output=True, text=True)
-        if result.stdout.strip():
-            dimensions = result.stdout.strip().split(',')
-            if len(dimensions) == 2:
-                screen_width = int(float(dimensions[0]))
-                screen_height = int(float(dimensions[1]))
-                return screen_width, screen_height
-                
-        # If we still don't have dimensions, fallback to defaults
-        return 2880, 1600
     except Exception as e:
-        print(f"Error getting screen dimensions: {e}")
-        # Fallback to default values
-        return 2880, 1600
+        print(f"AppleScript Finder method failed: {e}")
+    
+    # Method 4: Try using osascript with display properties
+    applescript_display = '''
+    tell application "System Events"
+        set _display to first display
+        return (value of _display's width) & "," & (value of _display's height)
+    end tell
+    '''
+    
+    try:
+        result = subprocess.run(["osascript", "-e", applescript_display], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            dimensions = result.stdout.strip().split(',')
+            if len(dimensions) == 2:
+                screen_width = int(float(dimensions[0]))
+                screen_height = int(float(dimensions[1]))
+                print(f"Screen dimensions detected via AppleScript (Display): {screen_width}x{screen_height}")
+                return screen_width, screen_height
+    except Exception as e:
+        print(f"AppleScript Display method failed: {e}")
+    
+    # Method 5: Try using Python's built-in methods if available
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()
+        print(f"Screen dimensions detected via tkinter: {screen_width}x{screen_height}")
+        return screen_width, screen_height
+    except Exception as e:
+        print(f"tkinter method failed: {e}")
+    
+    # Fallback: Use common macOS resolutions based on detection
+    print("All screen detection methods failed, using intelligent fallback...")
+    
+    # Try to detect if we're on a MacBook or external display
+    try:
+        result = subprocess.run(["system_profiler", "SPHardwareDataType"], capture_output=True, text=True)
+        if "MacBook" in result.stdout:
+            # Common MacBook resolutions
+            print("Detected MacBook - using 2560x1600 (common MacBook Pro resolution)")
+            return 2560, 1600
+        else:
+            # Assume external display
+            print("Detected desktop Mac - using 2560x1440 (common external display resolution)")
+            return 2560, 1440
+    except:
+        pass
+    
+    # Final fallback
+    print("Using final fallback resolution: 2560x1440")
+    return 2560, 1440
 
 def open_urls_macos(url1, url2, url3, url4):
     """Open URLs on macOS with Chrome and position windows."""
