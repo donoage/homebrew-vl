@@ -1,9 +1,9 @@
 class Vl < Formula
   desc "Command-line tool to display stock volume leaders and index charts"
   homepage "https://github.com/donoage/homebrew-vl"
-  url "https://raw.githubusercontent.com/donoage/homebrew-vl/92e2666a497bc61570250ffd4eedbfca673bb9f5/bin/vl"
-  sha256 "a70431f44a00607313887954d89382925be8ced8d2dbb33b4c3cdb65b55ab698"
-  version "3.0.34"
+  url "https://raw.githubusercontent.com/donoage/homebrew-vl/b67bf95620f8ed093da1a02064450c04760bcadd/bin/vl"
+  sha256 "e96fdfeb6272e2a91fbcc14e0febad625a135ff13863a23f8dc1f13a397885ec"
+  version "3.0.35"
   
   depends_on "python@3"
 
