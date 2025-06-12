@@ -28,6 +28,7 @@ import argparse
 # VL Script Version 3.0.31 - Set TradeCount from 6 to 5 for all URLs
 # VL Script Version 3.0.32 - Improve screen size detection with multiple fallback methods
 # VL Script Version 3.0.33 - Add multi-display support and accurate logical resolution detection
+# VL Script Version 3.0.34 - Set MinDollars to 18M for DarkPools=1&Sweeps=1 URLs and change regular mode to use DarkPools=1
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
