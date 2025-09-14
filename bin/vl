@@ -31,6 +31,9 @@ import argparse
 # VL Script Version 3.0.34 - Set MinDollars to 18M for DarkPools=1&Sweeps=1 URLs and change regular mode to use DarkPools=1
 # VL Script Version 3.0.35 - Set TradeCount to 10 for DarkPools=1&Sweeps=1 URLs
 # VL Script Version 3.0.36 - Prevent closing of excess browser windows
+# VL Script Version 3.0.37 - Set MinDollars to 0 for DarkPools=1&Sweeps=1 URLs
+# VL Script Version 3.0.38 - Change URL2 to 3-month range and URL4 to 1-month range
+# VL Script Version 3.0.39 - Set TradeCount from 10 to 5 for DarkPools=1&Sweeps=1 URLs
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
@@ -115,11 +118,11 @@ def main():
         # Construct URLs with the provided ticker and dates
         url1 = f"https://www.volumeleaders.com/Chart0?StartDate={three_months_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=18000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url2 = f"https://www.volumeleaders.com/Chart0?StartDate={three_months_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
         url3 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=500000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=-1&Sweeps=-1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
         
-        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_week_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=18000000&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=10&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
+        url4 = f"https://www.volumeleaders.com/Chart0?StartDate={one_month_ago}&EndDate={today}&Ticker={ticker}&MinVolume=0&MaxVolume=2000000000&MinDollars=0&MaxDollars=300000000000&MinPrice=0&MaxPrice=100000&DarkPools=1&Sweeps=1&LatePrints=-1&SignaturePrints=0&VolumeProfile=0&Levels=5&TradeCount=5&VCD=0&TradeRank=-1&IncludePremarket=1&IncludeRTH=1&IncludeAH=1&IncludeOpening=1&IncludeClosing=1&IncludePhantom=1&IncludeOffsetting=1"
     
     # Detect operating system
     system = platform.system()
