@@ -31,7 +31,6 @@ import argparse
 # VL Script Version 3.0.34 - Set MinDollars to 18M for DarkPools=1&Sweeps=1 URLs and change regular mode to use DarkPools=1
 # VL Script Version 3.0.35 - Set TradeCount to 10 for DarkPools=1&Sweeps=1 URLs
 # VL Script Version 3.0.36 - Prevent closing of excess browser windows
-# VL Script Version 3.0.37 - Change browser from Chrome to Firefox
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
 
@@ -413,15 +412,15 @@ def open_urls_macos(url1, url2, url3, url4):
     print(f"Detected screen resolution: {screen_width}x{screen_height}")
     print(f"Window dimensions will be: {half_width}x{half_height}")
     
-    # Make sure Firefox is running
-    subprocess.run(["open", "-a", "Firefox"])
+    # Make sure Chrome is running
+    subprocess.run(["open", "-a", "Google Chrome"])
     time.sleep(0.5)
     
     # Enhanced method to check for browser windows
-    # This will find ALL Firefox windows, not just ones with volumeleaders in the title
+    # This will find ALL Chrome windows, not just ones with volumeleaders in the title
     applescript = '''
     try
-        tell application "Firefox"
+        tell application "Google Chrome"
             set windowCount to count of windows
             
             # First try to find any VolumeLeaders windows
@@ -489,7 +488,7 @@ def open_urls_macos(url1, url2, url3, url4):
         # Update existing windows
         applescript = f'''
         try
-            tell application "Firefox"
+            tell application "Google Chrome"
                 # Get the actual windows we'll be using
                 set targetWindows to {{}}
                 
@@ -613,7 +612,7 @@ def open_urls_macos(url1, url2, url3, url4):
         print(f"Creating new chart windows for {sys.argv[1].upper()}...")
         
         applescript = f'''
-        tell application "Firefox"
+        tell application "Google Chrome"
             # Window 1: Top-Left - 3 month chart
             make new window with properties {{bounds:{{0, 23, {half_width}, {half_height}}}}}
             tell active tab of front window to set URL to "{url1}"
