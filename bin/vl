@@ -9,6 +9,7 @@ import webbrowser
 import time
 import tempfile
 import argparse
+import json
 
 # VL Script Version 3.0.16 - Fix PowerShell execution in WSL to avoid shell misinterpretation
 # VL Script Version 3.0.17 - Prevent closing of extra browser windows
@@ -38,8 +39,56 @@ import argparse
 # VL Script Version 3.0.41 - Set all URLs to DarkPools=-1&Sweeps=-1
 # VL Script Version 3.0.45 - Fix AppleScript URL setting on macOS Sequoia/Tahoe by using open command
 # VL Script Version 3.0.46 - Use System Events for window positioning (more reliable than Chrome bounds)
+# VL Script Version 3.0.47 - Implement window ID caching to reuse same windows across ticker changes
 # Note: This accounts for weekends by skipping Saturday and Sunday. For example, if today is Monday,
 # 3 trading days ago would be the previous Wednesday (skipping the weekend).
+
+def get_cache_file():
+    """Get the path to the window cache file."""
+    cache_dir = os.path.expanduser("~/.cache/vl")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, "windows.json")
+
+def load_window_ids():
+    """Load saved window IDs from cache."""
+    cache_file = get_cache_file()
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_window_ids(window_ids):
+    """Save window IDs to cache."""
+    cache_file = get_cache_file()
+    with open(cache_file, 'w') as f:
+        json.dump(window_ids, f)
+
+def get_existing_windows():
+    """Get list of existing Chrome window IDs that match our saved IDs."""
+    saved_ids = load_window_ids()
+    if not saved_ids:
+        return []
+    
+    # Get all current Chrome window IDs
+    applescript = '''
+    tell application "Google Chrome"
+        set windowIDs to {}
+        repeat with w in windows
+            set end of windowIDs to id of w
+        end repeat
+        return windowIDs
+    end tell
+    '''
+    
+    result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+    if result.returncode == 0:
+        current_ids = [int(x.strip()) for x in result.stdout.strip().split(',') if x.strip()]
+        # Return saved IDs that still exist
+        return [wid for wid in saved_ids if wid in current_ids]
+    return []
 
 def print_usage():
     """Print usage instructions."""
@@ -426,117 +475,57 @@ def open_urls_macos(url1, url2, url3, url4, ticker="TICKER"):
     subprocess.run(["open", "-a", "Google Chrome"])
     time.sleep(1.0)
     
-    # Enhanced method to check for browser windows
-    # This will find ALL Chrome windows, not just ones with volumeleaders in the title
-    applescript = '''
-    try
-        tell application "Google Chrome"
-            set windowCount to count of windows
-            
-            # First try to find any VolumeLeaders windows
-            set vlWindows to {}
-            repeat with w in windows
-                try
-                    set tabCount to count of tabs of w
-                    repeat with t from 1 to tabCount
-                        set tabURL to URL of tab t of w
-                        if tabURL contains "volumeleaders.com/Chart" then
-                            set end of vlWindows to w
-                            exit repeat
-                        end if
-                    end repeat
-                on error
-                    # Skip if we can't get the URL
-                end try
-            end repeat
-            
-            # If we found VolumeLeaders windows, return those count
-            if (count of vlWindows) > 0 then
-                return "volumeleaders:" & (count of vlWindows)
-            end if
-            
-            # If not, just return the count of all windows with actual content
-            set contentWindows to {}
-            repeat with w in windows
-                # Only consider windows that aren't tiny
-                set winBounds to bounds of w
-                set winWidth to item 3 of winBounds - item 1 of winBounds
-                set winHeight to item 4 of winBounds - item 2 of winBounds
-                
-                if winWidth > 200 and winHeight > 200 then
-                    set end of contentWindows to w
-                end if
-            end repeat
-            
-            return "any:" & (count of contentWindows)
-        end tell
-    on error errMsg
-        return "error:" & errMsg
-    end try
-    '''
+    # Check for existing windows that we created before
+    existing_window_ids = get_existing_windows()
+    num_existing = len(existing_window_ids)
     
-    result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
-    window_info = result.stdout.strip()
+    print(f"Found {num_existing} existing VL windows")
     
-    window_count = 0
-    window_type = "none"
+    urls = [url1, url2, url3, url4]
+    window_ids = existing_window_ids[:]
     
-    if window_info.startswith("volumeleaders:"):
-        window_count = int(window_info.split(":")[1])
-        window_type = "volumeleaders"
-    elif window_info.startswith("any:"):
-        window_count = int(window_info.split(":")[1])
-        window_type = "any"
-    elif window_info.startswith("error:"):
-        print(f"Error checking for windows: {window_info}")
-    
-    print(f"Found {window_count} browser windows of type '{window_type}'")
-    
-    if window_count >= 1:
-        print(f"Reusing {window_count} existing browser windows...")
+    if num_existing == 4:
+        print(f"Reusing 4 existing browser windows...")
         
-        # Use open command to load URLs directly - more reliable than AppleScript on modern macOS
-        # Open URLs in separate windows using --new-window flag
-        subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url1])
-        time.sleep(0.3)
-        subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url2])
-        time.sleep(0.3)
-        subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url3])
-        time.sleep(0.3)
-        subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url4])
-        time.sleep(0.5)
-        
-        # Now position the windows using System Events (more reliable)
+        # Update URLs in existing windows by ID and position them
         applescript = f'''
         try
             tell application "Google Chrome"
                 activate
+                
+                # Find windows by ID and update URLs
+                set targetWindows to {{}}
+                repeat with w in windows
+                    if id of w is {window_ids[0]} or id of w is {window_ids[1]} or id of w is {window_ids[2]} or id of w is {window_ids[3]} then
+                        set end of targetWindows to w
+                    end if
+                end repeat
+                
+                # Update URLs (windows are in order they were found)
+                if (count of targetWindows) >= 1 then set URL of active tab of item 1 of targetWindows to "{url1}"
+                if (count of targetWindows) >= 2 then set URL of active tab of item 2 of targetWindows to "{url2}"
+                if (count of targetWindows) >= 3 then set URL of active tab of item 3 of targetWindows to "{url3}"
+                if (count of targetWindows) >= 4 then set URL of active tab of item 4 of targetWindows to "{url4}"
             end tell
             
             delay 1.0
             
             tell application "System Events"
                 tell process "Google Chrome"
-                    set windowCount to count of windows
-                    
-                    # Position the first 4 windows in a 2x2 grid
-                    if windowCount >= 4 then
-                        # Window 1: Top-Left
+                    # Position first 4 windows in a 2x2 grid
+                    if (count of windows) >= 1 then
                         set position of window 1 to {{0, 23}}
                         set size of window 1 to {{{half_width}, {half_height - 23}}}
-                        delay 0.1
-                        
-                        # Window 2: Top-Right  
+                    end if
+                    if (count of windows) >= 2 then
                         set position of window 2 to {{{half_width}, 23}}
                         set size of window 2 to {{{half_width}, {half_height - 23}}}
-                        delay 0.1
-                        
-                        # Window 3: Bottom-Left
+                    end if
+                    if (count of windows) >= 3 then
                         set position of window 3 to {{0, {half_height}}}
                         set size of window 3 to {{{half_width}, {half_height}}}
-                        delay 0.1
-                        
-                        # Window 4: Bottom-Right
+                    end if
+                    if (count of windows) >= 4 then
                         set position of window 4 to {{{half_width}, {half_height}}}
                         set size of window 4 to {{{half_width}, {half_height}}}
                     end if
@@ -557,31 +546,85 @@ def open_urls_macos(url1, url2, url3, url4, ticker="TICKER"):
             print(f"Error positioning windows: {result.stdout.strip()}")
         else:
             print(f"Successfully updated chart windows for {ticker}")
-    else:
-        # No existing windows found, create new ones
-        print(f"Creating new chart windows for {ticker}...")
+    elif num_existing > 0 and num_existing < 4:
+        print(f"Found {num_existing} windows, creating {4 - num_existing} more...")
         
-        applescript = f'''
+        # Update existing windows and create missing ones
+        # First update existing windows
+        if num_existing > 0:
+            applescript_update = f'''
+            tell application "Google Chrome"
+                set targetWindows to {{}}
+                repeat with w in windows
+                    if id of w is in {{{", ".join(map(str, window_ids))}}} then
+                        set end of targetWindows to w
+                    end if
+                end repeat
+                
+                if (count of targetWindows) >= 1 then set URL of active tab of item 1 of targetWindows to "{urls[0]}"
+                if (count of targetWindows) >= 2 then set URL of active tab of item 2 of targetWindows to "{urls[1]}"
+                if (count of targetWindows) >= 3 then set URL of active tab of item 3 of targetWindows to "{urls[2]}"
+            end tell
+            '''
+            subprocess.run(["osascript", "-e", applescript_update], capture_output=True, text=True)
+        
+        # Create the missing windows
+        for url in urls[num_existing:]:
+            subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url])
+            time.sleep(0.5)
+        
+        # Get IDs of all windows now
+        time.sleep(0.5)
+        applescript_get_ids = '''
         tell application "Google Chrome"
-            # Window 1: Top-Left - 3 month chart
-            make new window with properties {{bounds:{{0, 23, {half_width}, {half_height}}}}}
-            set URL of active tab of front window to "{url1}"
-            delay 0.3
-            
-            # Window 2: Top-Right - 1 month chart with dark pools and sweeps
-            make new window with properties {{bounds:{{{half_width}, 23, {screen_width}, {half_height}}}}}
-            set URL of active tab of front window to "{url2}"
-            delay 0.3
-            
-            # Window 3: Bottom-Left - 1 month chart
-            make new window with properties {{bounds:{{0, {half_height}, {half_width}, {screen_height}}}}}
-            set URL of active tab of front window to "{url3}"
-            delay 0.3
-            
-            # Window 4: Bottom-Right - 1 week chart with dark pools and sweeps
-            make new window with properties {{bounds:{{{half_width}, {half_height}, {screen_width}, {screen_height}}}}}
-            set URL of active tab of front window to "{url4}"
+            set windowIDs to {}
+            repeat with w in windows
+                set end of windowIDs to id of w
+            end repeat
+            return windowIDs
         end tell
+        '''
+        result = subprocess.run(["osascript", "-e", applescript_get_ids], capture_output=True, text=True)
+        if result.returncode == 0:
+            all_ids = [int(x.strip()) for x in result.stdout.strip().split(',') if x.strip()]
+            window_ids = all_ids[:4]  # Take first 4
+        
+        # Now position all windows
+        applescript = f'''
+        try
+            tell application "Google Chrome"
+                activate
+            end tell
+            
+            delay 1.0
+            
+            tell application "System Events"
+                tell process "Google Chrome"
+                    # Position the first 4 windows in a 2x2 grid
+                    # Window 1: Top-Left
+                    set position of window 1 to {{0, 23}}
+                    set size of window 1 to {{{half_width}, {half_height - 23}}}
+                    delay 0.1
+                    
+                    # Window 2: Top-Right  
+                    set position of window 2 to {{{half_width}, 23}}
+                    set size of window 2 to {{{half_width}, {half_height - 23}}}
+                    delay 0.1
+                    
+                    # Window 3: Bottom-Left
+                    set position of window 3 to {{0, {half_height}}}
+                    set size of window 3 to {{{half_width}, {half_height}}}
+                    delay 0.1
+                    
+                    # Window 4: Bottom-Right
+                    set position of window 4 to {{{half_width}, {half_height}}}
+                    set size of window 4 to {{{half_width}, {half_height}}}
+                end tell
+            end tell
+            return "success"
+        on error errMsg
+            return "ERROR: " & errMsg
+        end try
         '''
         
         result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
@@ -589,8 +632,84 @@ def open_urls_macos(url1, url2, url3, url4, ticker="TICKER"):
             print(f"AppleScript error (returncode {result.returncode}):")
             print(f"stdout: {result.stdout}")
             print(f"stderr: {result.stderr}")
+        elif result.stdout.strip().startswith("ERROR:"):
+            print(f"Error positioning windows: {result.stdout.strip()}")
         else:
             print(f"Successfully created chart windows for {ticker}")
+    else:
+        # No existing windows found, create new ones
+        print(f"Creating 4 new chart windows for {ticker}...")
+        
+        # Create 4 new windows
+        for url in urls:
+            subprocess.run(["open", "-na", "Google Chrome", "--args", "--new-window", url])
+            time.sleep(0.5)
+        
+        # Get IDs of the new windows
+        time.sleep(0.5)
+        applescript_get_ids = '''
+        tell application "Google Chrome"
+            set windowIDs to {}
+            repeat with w in windows
+                set end of windowIDs to id of w
+            end repeat
+            return windowIDs
+        end tell
+        '''
+        result = subprocess.run(["osascript", "-e", applescript_get_ids], capture_output=True, text=True)
+        if result.returncode == 0:
+            all_ids = [int(x.strip()) for x in result.stdout.strip().split(',') if x.strip()]
+            window_ids = all_ids[:4]  # Take first 4
+        
+        # Position the windows
+        applescript = f'''
+        try
+            tell application "Google Chrome"
+                activate
+            end tell
+            
+            delay 1.0
+            
+            tell application "System Events"
+                tell process "Google Chrome"
+                    if (count of windows) >= 1 then
+                        set position of window 1 to {{0, 23}}
+                        set size of window 1 to {{{half_width}, {half_height - 23}}}
+                    end if
+                    if (count of windows) >= 2 then
+                        set position of window 2 to {{{half_width}, 23}}
+                        set size of window 2 to {{{half_width}, {half_height - 23}}}
+                    end if
+                    if (count of windows) >= 3 then
+                        set position of window 3 to {{0, {half_height}}}
+                        set size of window 3 to {{{half_width}, {half_height}}}
+                    end if
+                    if (count of windows) >= 4 then
+                        set position of window 4 to {{{half_width}, {half_height}}}
+                        set size of window 4 to {{{half_width}, {half_height}}}
+                    end if
+                end tell
+            end tell
+            return "success"
+        on error errMsg
+            return "ERROR: " & errMsg
+        end try
+        '''
+        
+        result = subprocess.run(["osascript", "-e", applescript], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"AppleScript error (returncode {result.returncode}):")
+            print(f"stdout: {result.stdout}")
+            print(f"stderr: {result.stderr}")
+        elif result.stdout.strip().startswith("ERROR:"):
+            print(f"Error positioning windows: {result.stdout.strip()}")
+        else:
+            print(f"Successfully created chart windows for {ticker}")
+    
+    # Save the window IDs for next time
+    if window_ids:
+        save_window_ids(window_ids)
+        print(f"Saved {len(window_ids)} window IDs for reuse")
 
 def open_urls_default(url1, url2, url3, url4):
     """Open URLs on other platforms using the default browser."""
